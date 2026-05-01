@@ -1,0 +1,72 @@
+# Fix 12: Prometheus Alerting Rules
+# Alerts fire when conditions are met for the specified duration
+
+groups:
+  - name: benchmark-saas-alerts
+    rules:
+
+      # High CPU usage
+      - alert: HighCPUUsage
+        expr: rate(process_cpu_seconds_total[2m]) * 100 > 80
+        for: 2m
+        labels:
+          severity: warning
+        annotations:
+          summary: "High CPU usage on backend"
+          description: "CPU usage is {{ $value | printf \"%.1f\" }}% for more than 2 minutes."
+
+      # High memory usage
+      - alert: HighMemoryUsage
+        expr: (nodejs_heap_size_used_bytes / nodejs_heap_size_total_bytes) * 100 > 85
+        for: 2m
+        labels:
+          severity: warning
+        annotations:
+          summary: "High heap memory usage"
+          description: "Heap usage is {{ $value | printf \"%.1f\" }}%."
+
+      # High error rate
+      - alert: HighErrorRate
+        expr: |
+          rate(http_requests_total{status_code=~"5.."}[5m])
+          /
+          rate(http_requests_total[5m]) * 100 > 5
+        for: 1m
+        labels:
+          severity: critical
+        annotations:
+          summary: "High HTTP error rate"
+          description: "Error rate is {{ $value | printf \"%.1f\" }}% over the last 5 minutes."
+
+      # High request latency
+      - alert: HighLatency
+        expr: |
+          histogram_quantile(0.95,
+            rate(http_request_duration_ms_bucket[5m])
+          ) > 2000
+        for: 2m
+        labels:
+          severity: warning
+        annotations:
+          summary: "High p95 request latency"
+          description: "p95 latency is {{ $value | printf \"%.0f\" }}ms."
+
+      # Backend pod down
+      - alert: BackendDown
+        expr: up{job="benchmark-backend"} == 0
+        for: 30s
+        labels:
+          severity: critical
+        annotations:
+          summary: "Backend is down"
+          description: "The benchmark backend has been unreachable for 30 seconds."
+
+      # Event loop lag (Node.js specific)
+      - alert: EventLoopLag
+        expr: nodejs_eventloop_lag_mean_seconds * 1000 > 500
+        for: 1m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Node.js event loop lag is high"
+          description: "Event loop lag is {{ $value | printf \"%.0f\" }}ms."
