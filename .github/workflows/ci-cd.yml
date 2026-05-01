@@ -16,6 +16,7 @@ jobs:
   validate-backend:
     name: Validate Backend
     runs-on: ubuntu-latest
+    timeout-minutes: 10
     steps:
       - uses: actions/checkout@v4
 
@@ -60,6 +61,7 @@ jobs:
   build-backend:
     name: Build & Scan Backend
     runs-on: ubuntu-latest
+    timeout-minutes: 20
     needs: validate-backend
     steps:
       - uses: actions/checkout@v4
@@ -123,6 +125,7 @@ jobs:
   build-frontend:
     name: Build & Scan Frontend
     runs-on: ubuntu-latest
+    timeout-minutes: 15
     steps:
       - uses: actions/checkout@v4
 
