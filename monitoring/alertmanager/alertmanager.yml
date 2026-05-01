@@ -1,0 +1,40 @@
+global:
+  # Configure real SMTP credentials here for production email alerts
+  # smtp_smarthost: 'smtp.gmail.com:587'
+  # smtp_from: 'alerts@yourdomain.com'
+  # smtp_auth_username: 'alerts@yourdomain.com'
+  # smtp_auth_password: 'your-app-password'
+  resolve_timeout: 5m
+
+route:
+  group_by: ['alertname', 'severity']
+  group_wait:      30s
+  group_interval:  5m
+  repeat_interval: 4h
+  receiver: 'default'
+
+  routes:
+    - match:
+        severity: critical
+      receiver: slack-critical
+      group_wait: 10s
+
+receivers:
+  # Default receiver — logs alerts (no email configured for demo)
+  - name: 'default'
+
+  # Slack receiver — configure webhook URL for real alerts
+  - name: 'slack-critical'
+    slack_configs:
+      - api_url: 'https://hooks.slack.com/services/YOUR/SLACK/WEBHOOK'
+        channel: '#alerts'
+        title: '{{ .GroupLabels.alertname }}'
+        text: '{{ range .Alerts }}{{ .Annotations.summary }}{{ end }}'
+        send_resolved: true
+
+inhibit_rules:
+  - source_match:
+      severity: 'critical'
+    target_match:
+      severity: 'warning'
+    equal: ['alertname']

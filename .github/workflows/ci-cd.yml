@@ -1,0 +1,275 @@
+name: CI/CD Pipeline — API Benchmark SaaS
+
+on:
+  push:
+    branches: [main, develop]
+  pull_request:
+    branches: [main]
+
+env:
+  REGISTRY: docker.io
+  BACKEND_IMAGE:  ${{ secrets.DOCKERHUB_USERNAME }}/benchmark-backend
+  FRONTEND_IMAGE: ${{ secrets.DOCKERHUB_USERNAME }}/benchmark-frontend
+
+jobs:
+  # ── Job 1: Lint & Validate Backend ───────────────────────────────────────────
+  validate-backend:
+    name: Validate Backend
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+          cache-dependency-path: backend/package-lock.json
+
+      - name: Install dependencies
+        run: npm ci
+        working-directory: backend
+
+      # Stronger than node --check: actually resolves all require() imports.
+      # Uses NODE_PATH trick to satisfy missing runtime deps (pg, redis, etc.)
+      # without needing a real DB/Redis connection.
+      - name: Validate all imports load correctly
+        run: |
+          node -e "
+            // Stub external services so require() succeeds without live connections
+            process.env.NODE_ENV = 'test';
+            process.env.OTEL_ENABLED = 'false';   // skip tracing init
+            process.env.DB_HOST = 'localhost';
+            process.env.REDIS_HOST = 'localhost';
+            process.env.JWT_SECRET = 'ci-test-secret';
+
+            // Verify every module resolves without import errors
+            require('./src/logger');
+            require('./src/db');
+            require('./src/queue');
+            require('./src/middleware/auth');
+            require('./src/middleware/rateLimiter');
+            require('./src/middleware/appMetrics');
+            require('./src/routes/auth');
+            require('./src/routes/metrics');
+            require('./src/routes/events');
+            console.log('All modules loaded successfully');
+          "
+        working-directory: backend
+
+  # ── Job 2: Build & Scan Backend ──────────────────────────────────────────────
+  build-backend:
+    name: Build & Scan Backend
+    runs-on: ubuntu-latest
+    needs: validate-backend
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: docker/setup-buildx-action@v3
+
+      # Fix 8: Cache Docker layers between runs
+      - name: Cache Docker layers
+        uses: actions/cache@v4
+        with:
+          path: /tmp/.buildx-cache-backend
+          key: ${{ runner.os }}-buildx-backend-${{ github.sha }}
+          restore-keys: |
+            ${{ runner.os }}-buildx-backend-
+
+      - name: Login to Docker Hub
+        if: github.ref == 'refs/heads/main' || github.ref == 'refs/heads/develop'
+        uses: docker/login-action@v3
+        with:
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+
+      - name: Build backend image
+        uses: docker/build-push-action@v5
+        with:
+          context: ./backend
+          push: false
+          tags: ${{ env.BACKEND_IMAGE }}:${{ github.sha }}
+          load: true
+          cache-from: type=local,src=/tmp/.buildx-cache-backend
+          cache-to:   type=local,dest=/tmp/.buildx-cache-backend-new,mode=max
+
+      # Fix 8: Move cache (prevents unbounded growth)
+      - name: Move cache
+        run: |
+          rm -rf /tmp/.buildx-cache-backend
+          mv /tmp/.buildx-cache-backend-new /tmp/.buildx-cache-backend
+
+      # Security scan — Fix 14 (Trivy)
+      - name: Trivy scan — backend
+        uses: aquasecurity/trivy-action@master
+        with:
+          image-ref:      ${{ env.BACKEND_IMAGE }}:${{ github.sha }}
+          format:         'table'
+          exit-code:      '1'
+          ignore-unfixed: true
+          vuln-type:      'os,library'
+          severity:       'CRITICAL'
+
+      - name: Push backend image
+        if: github.ref == 'refs/heads/main' || github.ref == 'refs/heads/develop'
+        uses: docker/build-push-action@v5
+        with:
+          context: ./backend
+          push: true
+          tags: |
+            ${{ env.BACKEND_IMAGE }}:${{ github.sha }}
+            ${{ env.BACKEND_IMAGE }}:latest
+
+  # ── Job 3: Build & Scan Frontend ─────────────────────────────────────────────
+  build-frontend:
+    name: Build & Scan Frontend
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+          cache-dependency-path: frontend/package-lock.json
+
+      - name: Install & build frontend
+        run: |
+          npm ci
+          npm run build
+        working-directory: frontend
+
+      - uses: docker/setup-buildx-action@v3
+
+      # Fix 8: Cache Docker layers
+      - name: Cache Docker layers
+        uses: actions/cache@v4
+        with:
+          path: /tmp/.buildx-cache-frontend
+          key: ${{ runner.os }}-buildx-frontend-${{ github.sha }}
+          restore-keys: |
+            ${{ runner.os }}-buildx-frontend-
+
+      - name: Login to Docker Hub
+        if: github.ref == 'refs/heads/main' || github.ref == 'refs/heads/develop'
+        uses: docker/login-action@v3
+        with:
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+
+      - name: Build frontend image
+        uses: docker/build-push-action@v5
+        with:
+          context: ./frontend
+          push: false
+          tags: ${{ env.FRONTEND_IMAGE }}:${{ github.sha }}
+          load: true
+          cache-from: type=local,src=/tmp/.buildx-cache-frontend
+          cache-to:   type=local,dest=/tmp/.buildx-cache-frontend-new,mode=max
+
+      - name: Move cache
+        run: |
+          rm -rf /tmp/.buildx-cache-frontend
+          mv /tmp/.buildx-cache-frontend-new /tmp/.buildx-cache-frontend
+
+      - name: Trivy scan — frontend
+        uses: aquasecurity/trivy-action@master
+        with:
+          image-ref:      ${{ env.FRONTEND_IMAGE }}:${{ github.sha }}
+          format:         'table'
+          exit-code:      '1'
+          ignore-unfixed: true
+          vuln-type:      'os,library'
+          severity:       'CRITICAL'
+
+      - name: Push frontend image
+        if: github.ref == 'refs/heads/main' || github.ref == 'refs/heads/develop'
+        uses: docker/build-push-action@v5
+        with:
+          context: ./frontend
+          push: true
+          tags: |
+            ${{ env.FRONTEND_IMAGE }}:${{ github.sha }}
+            ${{ env.FRONTEND_IMAGE }}:latest
+
+  # ── Job 4: Deploy to Staging (develop branch) ────────────────────────────────
+  deploy-staging:
+    name: Deploy to Staging
+    runs-on: ubuntu-latest
+    needs: [build-backend, build-frontend]
+    if: github.ref == 'refs/heads/develop'
+    environment: staging   # Fix 8: separate staging environment
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: azure/setup-kubectl@v3
+        with:
+          version: 'v1.28.0'
+
+      - name: Configure kubectl (staging)
+        run: |
+          mkdir -p ~/.kube
+          echo "${{ secrets.KUBE_CONFIG_STAGING }}" | base64 -d > ~/.kube/config
+
+      - name: Deploy to staging namespace
+        run: |
+          kubectl apply -f k8s/namespace.yaml
+          kubectl apply -f k8s/secrets.yaml
+          kubectl apply -f k8s/postgres-deployment.yaml
+          kubectl apply -f k8s/backend-deployment.yaml
+          kubectl apply -f k8s/frontend-deployment.yaml
+          kubectl apply -f k8s/hpa.yaml
+          kubectl set image deployment/backend  backend=${{ env.BACKEND_IMAGE }}:${{ github.sha }}  -n benchmark
+          kubectl set image deployment/frontend frontend=${{ env.FRONTEND_IMAGE }}:${{ github.sha }} -n benchmark
+
+      - name: Wait for staging rollout
+        run: |
+          kubectl rollout status deployment/backend  -n benchmark --timeout=120s
+          kubectl rollout status deployment/frontend -n benchmark --timeout=120s
+
+  # ── Job 5: Deploy to Production (main branch) ────────────────────────────────
+  deploy-production:
+    name: Deploy to Production
+    runs-on: ubuntu-latest
+    needs: [build-backend, build-frontend]
+    if: github.ref == 'refs/heads/main'
+    environment: production  # Fix 8: separate production environment with approval gate
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: azure/setup-kubectl@v3
+        with:
+          version: 'v1.28.0'
+
+      - name: Configure kubectl (production)
+        run: |
+          mkdir -p ~/.kube
+          echo "${{ secrets.KUBE_CONFIG }}" | base64 -d > ~/.kube/config
+
+      - name: Deploy to production
+        run: |
+          kubectl apply -f k8s/namespace.yaml
+          kubectl apply -f k8s/secrets.yaml
+          kubectl apply -f k8s/postgres-deployment.yaml
+          kubectl apply -f k8s/backend-deployment.yaml
+          kubectl apply -f k8s/frontend-deployment.yaml
+          kubectl apply -f k8s/hpa.yaml
+          kubectl set image deployment/backend  backend=${{ env.BACKEND_IMAGE }}:${{ github.sha }}  -n benchmark
+          kubectl set image deployment/frontend frontend=${{ env.FRONTEND_IMAGE }}:${{ github.sha }} -n benchmark
+
+      - name: Wait for production rollout
+        id: rollout
+        run: |
+          kubectl rollout status deployment/backend  -n benchmark --timeout=120s
+          kubectl rollout status deployment/frontend -n benchmark --timeout=120s
+
+      # Fix 9: Automatic rollback if rollout fails
+      - name: Rollback on failure
+        if: failure() && steps.rollout.outcome == 'failure'
+        run: |
+          echo "Rollout failed — rolling back..."
+          kubectl rollout undo deployment/backend  -n benchmark
+          kubectl rollout undo deployment/frontend -n benchmark
+          kubectl rollout status deployment/backend  -n benchmark --timeout=60s
+          kubectl rollout status deployment/frontend -n benchmark --timeout=60s
+          echo "Rollback complete"
+          exit 1
