@@ -5,29 +5,34 @@ WORKDIR /app
 COPY package*.json ./
 RUN npm ci --only=production
 
-# ── Stage 2: Get k6 binary from official image ────────────────────────────────
-FROM grafana/k6:0.49.0 AS k6
-
-# ── Stage 3: Runtime ──────────────────────────────────────────────────────────
+# ── Stage 2: Runtime ──────────────────────────────────────────────────────────
 FROM node:20-alpine
 
-# Security: run as non-root user
 RUN addgroup -S appgroup && adduser -S appuser -G appgroup
 
 WORKDIR /app
 
-# Copy production dependencies
 COPY --from=builder /app/node_modules ./node_modules
-
-# Copy k6 binary from official image (no curl/download needed)
-COPY --from=k6 /usr/bin/k6 /usr/local/bin/k6
-
-# Copy application source
 COPY src/ ./src/
 COPY k6/ ./k6/
 COPY package.json ./
 
-# Set ownership
+# Install k6 only if not in CI environment
+# In CI: image is built for scanning only, k6 not needed
+# In production: set INSTALL_K6=true
+ARG INSTALL_K6=false
+RUN if [ "$INSTALL_K6" = "true" ]; then \
+      apk add --no-cache curl && \
+      ARCH=$(uname -m) && \
+      if [ "$ARCH" = "x86_64" ]; then K6_ARCH="amd64"; else K6_ARCH="arm64"; fi && \
+      curl -L "https://github.com/grafana/k6/releases/download/v0.49.0/k6-v0.49.0-linux-${K6_ARCH}.tar.gz" \
+        -o /tmp/k6.tar.gz && \
+      tar -xzf /tmp/k6.tar.gz -C /tmp && \
+      mv "/tmp/k6-v0.49.0-linux-${K6_ARCH}/k6" /usr/local/bin/k6 && \
+      rm -rf /tmp/k6* && \
+      apk del curl; \
+    fi
+
 RUN chown -R appuser:appgroup /app
 
 USER appuser

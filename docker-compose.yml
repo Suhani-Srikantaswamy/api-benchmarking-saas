@@ -43,6 +43,8 @@ services:
     build:
       context: ./backend
       dockerfile: Dockerfile
+      args:
+        INSTALL_K6: "true"
     container_name: benchmark-backend
     restart: unless-stopped
     environment:
@@ -79,6 +81,8 @@ services:
     build:
       context: ./backend
       dockerfile: Dockerfile
+      args:
+        INSTALL_K6: "true"
     container_name: benchmark-worker
     restart: unless-stopped
     command: ["node", "src/worker.js"]
