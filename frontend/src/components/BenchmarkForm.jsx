@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import './BenchmarkForm.css';
 
 const PRESETS = [
@@ -14,28 +14,44 @@ const DEMO_URLS = [
 ];
 
 const AUTH_MODES = [
-  { id: 'none',   label: 'None',         desc: 'Public API — no auth needed' },
-  { id: 'bearer', label: 'Bearer Token',  desc: 'Authorization: Bearer ...' },
-  { id: 'apikey', label: 'API Key',       desc: 'X-API-Key: ...' },
-  { id: 'custom', label: 'Custom JSON',   desc: 'Raw header object' },
+  { id: 'none',   label: 'None',        desc: 'Public API — no auth needed' },
+  { id: 'bearer', label: 'Bearer Token', desc: 'Authorization: Bearer ...' },
+  { id: 'apikey', label: 'API Key',      desc: 'X-API-Key: ...' },
+  { id: 'custom', label: 'Custom JSON',  desc: 'Raw header object' },
 ];
+
+const TEMPLATES_KEY = 'benchmark_templates';
 
 function validateUrl(url) {
   try { new URL(url); return true; } catch { return false; }
 }
 
-/** Build headers object from auth mode + value */
 function buildHeaders(authMode, authValue, customJson) {
-  if (authMode === 'bearer' && authValue.trim()) {
+  if (authMode === 'bearer' && authValue.trim())
     return { Authorization: `Bearer ${authValue.trim()}` };
-  }
-  if (authMode === 'apikey' && authValue.trim()) {
+  if (authMode === 'apikey' && authValue.trim())
     return { 'X-API-Key': authValue.trim() };
-  }
-  if (authMode === 'custom' && customJson.trim()) {
-    return JSON.parse(customJson.trim()); // caller must catch
-  }
+  if (authMode === 'custom' && customJson.trim())
+    return JSON.parse(customJson.trim());
   return {};
+}
+
+function loadTemplates() {
+  try { return JSON.parse(localStorage.getItem(TEMPLATES_KEY) || '[]'); } catch { return []; }
+}
+function saveTemplates(list) {
+  localStorage.setItem(TEMPLATES_KEY, JSON.stringify(list));
+}
+
+/* ── Chevron icon ────────────────────────────────────────────────────────── */
+function ChevronIcon({ open }) {
+  return (
+    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+      strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"
+      style={{ transform: open ? 'rotate(180deg)' : 'rotate(0deg)', transition: 'transform 0.2s ease' }}>
+      <polyline points="6 9 12 15 18 9"/>
+    </svg>
+  );
 }
 
 export default function BenchmarkForm({ onTestStart, disabled }) {
@@ -49,10 +65,53 @@ export default function BenchmarkForm({ onTestStart, disabled }) {
   const [loading,    setLoading]    = useState(false);
   const [error,      setError]      = useState('');
 
+  // Advanced settings
+  const [showAdvanced, setShowAdvanced] = useState(false);
+  const [rampUp,       setRampUp]       = useState('');
+  const [timeout,      setTimeout_]     = useState('');
+  const [payload,      setPayload]      = useState('');
+
+  // Templates
+  const [templates,     setTemplates]     = useState(loadTemplates);
+  const [templateName,  setTemplateName]  = useState('');
+  const [showTemplates, setShowTemplates] = useState(false);
+
   const urlValid   = apiUrl.trim() && validateUrl(apiUrl.trim());
   const urlInvalid = apiUrl.trim() && !urlValid;
 
   const applyPreset = ({ vus: v, duration: d }) => { setVus(v); setDuration(d); };
+
+  // ── Apply a saved template ────────────────────────────────────────────────
+  const applyTemplate = (t) => {
+    setApiUrl(t.apiUrl || '');
+    setVus(t.vus || 10);
+    setDuration(t.duration || '10s');
+    setMethod(t.method || 'GET');
+    setAuthMode(t.authMode || 'none');
+    setAuthValue(t.authValue || '');
+    setCustomJson(t.customJson || '');
+    setRampUp(t.rampUp || '');
+    setTimeout_(t.timeout || '');
+    setPayload(t.payload || '');
+    setShowTemplates(false);
+  };
+
+  // ── Save current config as template ──────────────────────────────────────
+  const saveTemplate = () => {
+    const name = templateName.trim() || `Template ${templates.length + 1}`;
+    const t = { id: Date.now(), name, apiUrl, vus, duration, method, authMode, authValue, customJson, rampUp, timeout, payload };
+    const updated = [...templates, t];
+    setTemplates(updated);
+    saveTemplates(updated);
+    setTemplateName('');
+  };
+
+  // ── Delete template ───────────────────────────────────────────────────────
+  const deleteTemplate = (id) => {
+    const updated = templates.filter(t => t.id !== id);
+    setTemplates(updated);
+    saveTemplates(updated);
+  };
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -67,12 +126,25 @@ export default function BenchmarkForm({ onTestStart, disabled }) {
       return;
     }
 
+    // Merge payload body if provided
+    let body = undefined;
+    if (payload.trim()) {
+      try { body = JSON.parse(payload.trim()); } catch {
+        setError('Payload body is not valid JSON.');
+        return;
+      }
+    }
+
     setLoading(true);
     try {
       const res = await fetch('/api/benchmark/run', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', 'X-API-Key': 'demo-key-12345' },
-        body: JSON.stringify({ apiUrl, vus: Number(vus), duration, method, headers: parsedHeaders }),
+        body: JSON.stringify({
+          apiUrl, vus: Number(vus), duration, method,
+          headers: parsedHeaders,
+          ...(body ? { body } : {}),
+        }),
       });
       const data = await res.json();
       if (!res.ok) {
@@ -90,8 +162,62 @@ export default function BenchmarkForm({ onTestStart, disabled }) {
   return (
     <div className="form-card fade-in">
       <div className="form-header">
-        <h2 className="form-title">Configure Load Test</h2>
-        <p className="form-subtitle">Test any public or authenticated API endpoint</p>
+        <div className="form-header-row">
+          <div>
+            <h2 className="form-title">Configure Load Test</h2>
+            <p className="form-subtitle">Test any public or authenticated API endpoint</p>
+          </div>
+          <button
+            type="button"
+            className="templates-toggle"
+            onClick={() => setShowTemplates(v => !v)}
+            title="Saved templates"
+          >
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
+              <polyline points="14 2 14 8 20 8"/>
+            </svg>
+            Templates
+            {templates.length > 0 && <span className="template-count">{templates.length}</span>}
+          </button>
+        </div>
+
+        {/* ── Templates panel ─────────────────────────────────────────── */}
+        {showTemplates && (
+          <div className="templates-panel fade-in">
+            {templates.length === 0 ? (
+              <p className="templates-empty">No saved templates yet. Fill in the form and save below.</p>
+            ) : (
+              <div className="templates-list">
+                {templates.map(t => (
+                  <div key={t.id} className="template-row">
+                    <button type="button" className="template-apply" onClick={() => applyTemplate(t)}>
+                      <span className="template-name">{t.name}</span>
+                      <span className="template-meta">{t.method} · {t.vus} VUs · {t.duration}</span>
+                    </button>
+                    <button type="button" className="template-delete" onClick={() => deleteTemplate(t.id)} title="Delete template">
+                      <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                        <line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/>
+                      </svg>
+                    </button>
+                  </div>
+                ))}
+              </div>
+            )}
+            <div className="template-save-row">
+              <input
+                type="text"
+                className="input template-name-input"
+                placeholder="Template name (optional)"
+                value={templateName}
+                onChange={e => setTemplateName(e.target.value)}
+              />
+              <button type="button" className="template-save-btn" onClick={saveTemplate}>
+                Save current
+              </button>
+            </div>
+          </div>
+        )}
       </div>
 
       <form onSubmit={handleSubmit} className="form-body">
@@ -100,8 +226,8 @@ export default function BenchmarkForm({ onTestStart, disabled }) {
         <div className="field">
           <label className="field-label" htmlFor="apiUrl">
             API Endpoint URL
-            {urlValid   && <span className="url-badge valid">✓ Valid</span>}
-            {urlInvalid && <span className="url-badge invalid">✗ Invalid</span>}
+            {urlValid   && <span className="url-badge valid">Valid</span>}
+            {urlInvalid && <span className="url-badge invalid">Invalid</span>}
           </label>
           <input
             id="apiUrl" type="text"
@@ -176,45 +302,33 @@ export default function BenchmarkForm({ onTestStart, disabled }) {
             ))}
           </div>
 
-          {/* Bearer token input */}
           {authMode === 'bearer' && (
             <div className="auth-input-wrap fade-in">
               <span className="auth-prefix">Bearer</span>
-              <input
-                type="text" className="input auth-input"
+              <input type="text" className="input auth-input"
                 value={authValue} onChange={e => setAuthValue(e.target.value)}
-                placeholder="YOUR_TOKEN_HERE"
-                disabled={disabled || loading}
-              />
+                placeholder="YOUR_TOKEN_HERE" disabled={disabled || loading} />
             </div>
           )}
 
-          {/* API Key input */}
           {authMode === 'apikey' && (
             <div className="auth-input-wrap fade-in">
               <span className="auth-prefix">X-API-Key</span>
-              <input
-                type="text" className="input auth-input"
+              <input type="text" className="input auth-input"
                 value={authValue} onChange={e => setAuthValue(e.target.value)}
-                placeholder="YOUR_API_KEY_HERE"
-                disabled={disabled || loading}
-              />
+                placeholder="YOUR_API_KEY_HERE" disabled={disabled || loading} />
             </div>
           )}
 
-          {/* Custom JSON */}
           {authMode === 'custom' && (
             <div className="fade-in" style={{ marginTop: '0.5rem' }}>
-              <textarea
-                className="input textarea-mono"
+              <textarea className="input textarea-mono"
                 value={customJson} onChange={e => setCustomJson(e.target.value)}
                 placeholder={'{"Authorization":"Bearer token","X-Custom":"value"}'}
-                rows={3} disabled={disabled || loading} spellCheck={false}
-              />
+                rows={3} disabled={disabled || loading} spellCheck={false} />
             </div>
           )}
 
-          {/* Preview of what will be sent */}
           {authMode !== 'none' && (authValue.trim() || customJson.trim()) && (
             <div className="auth-preview">
               <span className="auth-preview-label">Will send:</span>
@@ -223,6 +337,58 @@ export default function BenchmarkForm({ onTestStart, disabled }) {
                 {authMode === 'apikey' && `X-API-Key: ${authValue}`}
                 {authMode === 'custom' && customJson}
               </code>
+            </div>
+          )}
+        </div>
+
+        {/* ── Advanced Settings (collapsible) ─────────────────────────── */}
+        <div className="advanced-section">
+          <button
+            type="button"
+            className="advanced-toggle"
+            onClick={() => setShowAdvanced(v => !v)}
+          >
+            <span>Advanced Settings</span>
+            <span className="advanced-tag">optional</span>
+            <ChevronIcon open={showAdvanced} />
+          </button>
+
+          {showAdvanced && (
+            <div className="advanced-body fade-in">
+              <div className="fields-row">
+                <div className="field">
+                  <label className="field-label" htmlFor="rampUp">
+                    Ramp-up Time
+                    <span className="optional-tag">e.g. 5s</span>
+                  </label>
+                  <input id="rampUp" type="text" className="input"
+                    value={rampUp} onChange={e => setRampUp(e.target.value)}
+                    placeholder="5s" disabled={disabled || loading} />
+                  <span className="field-hint">Gradually increase VUs over this period</span>
+                </div>
+                <div className="field">
+                  <label className="field-label" htmlFor="timeout">
+                    Request Timeout
+                    <span className="optional-tag">e.g. 5000</span>
+                  </label>
+                  <input id="timeout" type="number" className="input"
+                    value={timeout} onChange={e => setTimeout_(e.target.value)}
+                    placeholder="5000" min="100" max="60000" disabled={disabled || loading} />
+                  <span className="field-hint">Max ms per request before timeout</span>
+                </div>
+              </div>
+
+              <div className="field">
+                <label className="field-label" htmlFor="payload">
+                  Request Body (JSON)
+                  <span className="optional-tag">POST / PUT / PATCH</span>
+                </label>
+                <textarea id="payload" className="input textarea-mono"
+                  value={payload} onChange={e => setPayload(e.target.value)}
+                  placeholder={'{"key":"value"}'}
+                  rows={3} disabled={disabled || loading} spellCheck={false} />
+                <span className="field-hint">Sent as JSON body for POST/PUT/PATCH requests</span>
+              </div>
             </div>
           )}
         </div>

@@ -9,12 +9,94 @@ import './App.css';
 
 const API_KEY = 'demo-key-12345';
 
+/* ── SVG icons ───────────────────────────────────────────────────────────── */
+const Icons = {
+  Dashboard: () => (
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/>
+      <rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/>
+    </svg>
+  ),
+  History: () => (
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <circle cx="12" cy="12" r="9"/><polyline points="12 7 12 12 15 15"/>
+    </svg>
+  ),
+  Compare: () => (
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/>
+      <line x1="6" y1="20" x2="6" y2="14"/>
+    </svg>
+  ),
+  Collapse: () => (
+    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+      <polyline points="15 18 9 12 15 6"/>
+    </svg>
+  ),
+  Expand: () => (
+    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+      <polyline points="9 18 15 12 9 6"/>
+    </svg>
+  ),
+  Grafana: () => (
+    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/>
+    </svg>
+  ),
+  Prometheus: () => (
+    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <circle cx="12" cy="12" r="9"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/>
+    </svg>
+  ),
+  Jaeger: () => (
+    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <circle cx="12" cy="12" r="3"/><line x1="3" y1="12" x2="9" y2="12"/><line x1="15" y1="12" x2="21" y2="12"/>
+      <line x1="12" y1="3" x2="12" y2="9"/><line x1="12" y1="15" x2="12" y2="21"/>
+    </svg>
+  ),
+};
+
+/* ── Service health check ────────────────────────────────────────────────── */
+const SERVICES = [
+  { id: 'grafana',    label: 'Grafana',    url: 'http://localhost:3001', checkUrl: 'http://localhost:3001/api/health', Icon: Icons.Grafana },
+  { id: 'prometheus', label: 'Prometheus', url: 'http://localhost:9090', checkUrl: 'http://localhost:9090/-/healthy',  Icon: Icons.Prometheus },
+  { id: 'jaeger',     label: 'Jaeger',     url: 'http://localhost:16686', checkUrl: 'http://localhost:16686/',         Icon: Icons.Jaeger },
+];
+
+function useServiceStatus() {
+  const [statuses, setStatuses] = useState({ grafana: 'checking', prometheus: 'checking', jaeger: 'checking' });
+
+  useEffect(() => {
+    const check = async () => {
+      const results = await Promise.allSettled(
+        SERVICES.map(s =>
+          fetch(s.checkUrl, { mode: 'no-cors', signal: AbortSignal.timeout(3000) })
+        )
+      );
+      const next = {};
+      results.forEach((r, i) => {
+        // no-cors fetch resolves with opaque response (type='opaque') if server is up
+        // it rejects only if the server is completely unreachable
+        next[SERVICES[i].id] = r.status === 'fulfilled' ? 'ok' : 'down';
+      });
+      setStatuses(next);
+    };
+    check();
+    const t = setInterval(check, 30000);
+    return () => clearInterval(t);
+  }, []);
+
+  return statuses;
+}
+
 export default function App() {
-  const [activeTest,     setActiveTest]     = useState(null);
-  const [view,           setView]           = useState('home');
-  const [backendStatus,  setBackendStatus]  = useState('checking');
-  const [toast,          setToast]          = useState(null); // {msg, type}
+  const [activeTest,    setActiveTest]    = useState(null);
+  const [view,          setView]          = useState('home');
+  const [backendStatus, setBackendStatus] = useState('checking');
+  const [toast,         setToast]         = useState(null);
+  const [collapsed,     setCollapsed]     = useState(false);
   const eventSourceRef = useRef(null);
+  const serviceStatuses = useServiceStatus();
 
   // ── Toast helper ──────────────────────────────────────────────────────────
   const showToast = useCallback((msg, type = 'info') => {
@@ -95,44 +177,67 @@ export default function App() {
   };
 
   const navItems = [
-    { id: 'home',    label: 'Dashboard' },
-    { id: 'history', label: 'History'   },
-    { id: 'compare', label: 'Compare'   },
+    { id: 'home',    label: 'Dashboard', Icon: Icons.Dashboard },
+    { id: 'history', label: 'History',   Icon: Icons.History   },
+    { id: 'compare', label: 'Compare',   Icon: Icons.Compare   },
   ];
 
   return (
-    <div className="app-shell">
+    <div className={`app-shell ${collapsed ? 'sidebar-collapsed' : ''}`}>
       {/* ── Sidebar ─────────────────────────────────────────────────────── */}
       <aside className="sidebar">
         <div className="sidebar-logo">
           <div className="logo-mark">B</div>
-          <span className="logo-text">BenchmarkSaaS</span>
+          {!collapsed && <span className="logo-text">BenchmarkSaaS</span>}
+          <button
+            className="collapse-btn"
+            onClick={() => setCollapsed(v => !v)}
+            title={collapsed ? 'Expand sidebar' : 'Collapse sidebar'}
+            aria-label={collapsed ? 'Expand sidebar' : 'Collapse sidebar'}
+          >
+            {collapsed ? <Icons.Expand /> : <Icons.Collapse />}
+          </button>
         </div>
 
         <nav className="sidebar-nav">
-          {navItems.map(({ id, label }) => (
+          {navItems.map(({ id, label, Icon }) => (
             <button key={id}
               className={`nav-item ${view === id ? 'active' : ''}`}
-              onClick={() => setView(id)}>
-              <span className="nav-dot" />
-              <span>{label}</span>
+              onClick={() => setView(id)}
+              title={collapsed ? label : undefined}>
+              <span className="nav-icon"><Icon /></span>
+              {!collapsed && <span className="nav-label">{label}</span>}
             </button>
           ))}
         </nav>
 
         <div className="sidebar-footer">
-          <div className={`backend-badge ${backendStatus}`}>
+          <div className={`backend-badge ${backendStatus}`} title="API backend health">
             <span className="badge-dot" />
-            <span>
-              {backendStatus === 'ok'       && 'Backend Online'}
-              {backendStatus === 'down'     && 'Backend Offline'}
-              {backendStatus === 'checking' && 'Checking...'}
-            </span>
+            {!collapsed && (
+              <span>
+                {backendStatus === 'ok'       && 'Backend Online'}
+                {backendStatus === 'down'     && 'Backend Offline'}
+                {backendStatus === 'checking' && 'Checking...'}
+              </span>
+            )}
           </div>
-          <div className="sidebar-links">
-            <a href="http://localhost:3001" target="_blank" rel="noreferrer">Grafana</a>
-            <a href="http://localhost:9090" target="_blank" rel="noreferrer">Prometheus</a>
-            <a href="http://localhost:16686" target="_blank" rel="noreferrer">Jaeger</a>
+
+          <div className="sidebar-services">
+            {SERVICES.map(({ id, label, url, Icon }) => (
+              <a
+                key={id}
+                href={url}
+                target="_blank"
+                rel="noreferrer"
+                className={`service-link status-${serviceStatuses[id]}`}
+                title={`${label} — ${serviceStatuses[id] === 'ok' ? 'Running' : serviceStatuses[id] === 'down' ? 'Unreachable' : 'Checking...'}`}
+              >
+                <span className="service-dot" />
+                <span className="service-icon"><Icon /></span>
+                {!collapsed && <span className="service-label">{label}</span>}
+              </a>
+            ))}
           </div>
         </div>
       </aside>
