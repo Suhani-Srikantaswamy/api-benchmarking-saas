@@ -334,3 +334,66 @@
   .sidebar { display: none; }
   .page-content { padding: 1rem; }
 }
+
+/* ── Form collapse wrapper ───────────────────────────────────────────────── */
+.form-collapse-wrap {
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+}
+
+.form-collapse-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0.7rem 1.25rem;
+  background: rgba(255,255,255,0.04);
+  border: 1px solid rgba(255,255,255,0.09);
+  border-radius: var(--radius-lg);
+  transition: border-radius 0.2s ease;
+}
+
+/* When form is visible, bar connects to form card */
+.form-collapse-wrap:not(.collapsed) .form-collapse-bar {
+  border-bottom-left-radius: 0;
+  border-bottom-right-radius: 0;
+  border-bottom-color: transparent;
+}
+
+/* When collapsed, bar is standalone */
+.form-collapse-wrap.collapsed .form-collapse-bar {
+  border-radius: var(--radius-lg);
+}
+
+/* Connect form card top to bar */
+.form-collapse-wrap:not(.collapsed) .form-card {
+  border-top-left-radius: 0;
+  border-top-right-radius: 0;
+  border-top-color: transparent;
+}
+
+.form-collapse-label {
+  font-size: 0.84rem;
+  font-weight: 700;
+  color: #e5e7eb;
+}
+
+.form-collapse-toggle {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  background: rgba(255,255,255,0.05);
+  border: 1px solid rgba(255,255,255,0.1);
+  border-radius: var(--radius-sm);
+  color: #9ca3af;
+  font-size: 0.75rem;
+  font-weight: 600;
+  padding: 0.3rem 0.75rem;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+.form-collapse-toggle:hover {
+  background: rgba(37,99,235,0.12);
+  border-color: rgba(37,99,235,0.35);
+  color: #ffffff;
+}

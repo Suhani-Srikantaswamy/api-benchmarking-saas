@@ -2,10 +2,11 @@ import React, { useState, useEffect, useRef } from 'react';
 import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid,
   Tooltip, ResponsiveContainer, Cell,
-  LineChart, Line, Area, AreaChart,
+  AreaChart, Area, ReferenceLine,
 } from 'recharts';
 import './Dashboard.css';
 
+/* ── Tooltip definitions ─────────────────────────────────────────────────── */
 const TOOLTIPS = {
   'Avg Latency':  'Average time taken per request (lower is better)',
   'Throughput':   'Requests completed per second (higher is better)',
@@ -42,11 +43,38 @@ function getInsights(result) {
   return insights;
 }
 
+/* ── Animated number ─────────────────────────────────────────────────────── */
+function AnimatedNumber({ value, duration = 800 }) {
+  const [display, setDisplay] = useState(0);
+  const startRef = useRef(null);
+  const rafRef   = useRef(null);
+
+  useEffect(() => {
+    if (value == null) return;
+    const target = Number(value);
+    const start  = performance.now();
+    startRef.current = 0;
+
+    const tick = (now) => {
+      const elapsed = now - start;
+      const progress = Math.min(elapsed / duration, 1);
+      // ease-out cubic
+      const eased = 1 - Math.pow(1 - progress, 3);
+      setDisplay(Math.round(eased * target));
+      if (progress < 1) rafRef.current = requestAnimationFrame(tick);
+    };
+    rafRef.current = requestAnimationFrame(tick);
+    return () => cancelAnimationFrame(rafRef.current);
+  }, [value, duration]);
+
+  return <>{display}</>;
+}
+
 /* ── Live ticker + real-time graph ──────────────────────────────────────── */
 function LiveTicker({ running, done }) {
-  const [count,   setCount]   = useState(0);
-  const [errors,  setErrors]  = useState(0);
-  const [latency, setLatency] = useState(0);
+  const [count,    setCount]    = useState(0);
+  const [errors,   setErrors]   = useState(0);
+  const [latency,  setLatency]  = useState(0);
   const [graphData, setGraphData] = useState([]);
   const tickRef = useRef(null);
   const timeRef = useRef(0);
@@ -112,75 +140,125 @@ function LiveTicker({ running, done }) {
   );
 }
 
-/* ── KPI Strip ───────────────────────────────────────────────────────────── */
-function KPIStrip({ result }) {
+/* ── KPI Strip (replaces metric cards — single source of truth) ──────────── */
+function KPIStrip({ result, running }) {
   const done = result.status === 'completed';
-  if (!done) return null;
+
+  if (!running && !done) return null;
+
+  const items = [
+    {
+      label: 'Avg Latency',
+      value: result.avg_response_time,
+      unit: 'ms',
+      color: latencyColor(result.avg_response_time),
+      sub: done ? `p95: ${result.p95_response_time ?? result.max_response_time ?? '—'} ms` : null,
+      tooltip: TOOLTIPS['Avg Latency'],
+    },
+    {
+      label: 'Throughput',
+      value: result.requests_per_sec,
+      unit: 'req/s',
+      color: '#818cf8',
+      sub: done ? `${result.total_requests ?? 0} total` : null,
+      tooltip: TOOLTIPS['Throughput'],
+    },
+    {
+      label: 'Error Rate',
+      value: result.error_rate,
+      unit: '%',
+      color: errorColor(result.error_rate),
+      sub: done ? `${result.failed_requests ?? 0} failed` : null,
+      tooltip: TOOLTIPS['Error Rate'],
+    },
+    {
+      label: 'Min Latency',
+      value: result.min_response_time,
+      unit: 'ms',
+      color: '#34d399',
+      sub: done ? 'best case' : null,
+      tooltip: 'Fastest single request in the test run',
+    },
+    {
+      label: 'Max Latency',
+      value: result.max_response_time,
+      unit: 'ms',
+      color: '#f87171',
+      sub: done ? 'worst case' : null,
+      tooltip: 'Slowest single request in the test run',
+    },
+  ];
+
   return (
     <div className="kpi-strip fade-in">
-      <div className="kpi-item">
-        <span className="kpi-label">Avg Latency</span>
-        <span className="kpi-value" style={{ color: latencyColor(result.avg_response_time) }}>
-          {result.avg_response_time ?? '—'}<span className="kpi-unit">ms</span>
-        </span>
-      </div>
-      <div className="kpi-divider" />
-      <div className="kpi-item">
-        <span className="kpi-label">Throughput</span>
-        <span className="kpi-value" style={{ color: '#818cf8' }}>
-          {result.requests_per_sec ?? '—'}<span className="kpi-unit">req/s</span>
-        </span>
-      </div>
-      <div className="kpi-divider" />
-      <div className="kpi-item">
-        <span className="kpi-label">Error Rate</span>
-        <span className="kpi-value" style={{ color: errorColor(result.error_rate) }}>
-          {result.error_rate ?? '—'}<span className="kpi-unit">%</span>
-        </span>
-      </div>
-      <div className="kpi-divider" />
-      <div className="kpi-item">
-        <span className="kpi-label">Total Requests</span>
-        <span className="kpi-value" style={{ color: '#ffffff' }}>
-          {result.total_requests ?? '—'}
-        </span>
-      </div>
-      <div className="kpi-divider" />
-      <div className="kpi-item">
-        <span className="kpi-label">p95 Latency</span>
-        <span className="kpi-value" style={{ color: '#a1a1aa' }}>
-          {result.p95_response_time ?? result.max_response_time ?? '—'}<span className="kpi-unit">ms</span>
-        </span>
-      </div>
+      {items.map((item, i) => (
+        <React.Fragment key={item.label}>
+          {i > 0 && <div className="kpi-divider" />}
+          <KPIItem {...item} running={running} done={done} />
+        </React.Fragment>
+      ))}
     </div>
   );
 }
 
-/* ── Metric card ─────────────────────────────────────────────────────────── */
-function MetricCard({ icon, label, value, unit, color, statusText, status, sub, running }) {
+function KPIItem({ label, value, unit, color, sub, tooltip, running, done }) {
   const [tip, setTip] = useState(false);
   return (
-    <div className="metric-card" style={{ '--accent': color }}
-      onMouseEnter={() => setTip(true)} onMouseLeave={() => setTip(false)}>
-      <div className="mc-top">
-        {icon && <span className="mc-icon">{icon}</span>}
-        <span className="mc-label">{label}</span>
-        <span className="mc-info" title={TOOLTIPS[label]}>ⓘ</span>
-      </div>
-      <div className="mc-value" style={{ color }}>
-        {statusText ? (
-          <span className={`status-pill ${status}${status === 'completed' && color === '#f59e0b' ? ' has-errors' : ''}`}>{statusText}</span>
-        ) : running ? (
-          <span className="mc-skeleton" />
+    <div
+      className="kpi-item"
+      onMouseEnter={() => setTip(true)}
+      onMouseLeave={() => setTip(false)}
+      style={{ position: 'relative' }}
+    >
+      <span className="kpi-label">{label}</span>
+      <span className="kpi-value" style={{ color }}>
+        {running ? (
+          <span className="kpi-skeleton" />
+        ) : done && value != null ? (
+          <><AnimatedNumber value={value} /><span className="kpi-unit">{unit}</span></>
         ) : (
-          <>{value ?? '—'}<span className="mc-unit">{unit}</span></>
+          <span style={{ color: '#4b5563', fontSize: '1.2rem' }}>—</span>
         )}
-      </div>
-      {sub && <div className="mc-sub">{sub}</div>}
-      {tip && TOOLTIPS[label] && (
-        <div className="mc-tooltip">{TOOLTIPS[label]}</div>
-      )}
+      </span>
+      {sub && done && <span className="kpi-sub">{sub}</span>}
+      {tip && tooltip && <div className="kpi-tooltip">{tooltip}</div>}
     </div>
+  );
+}
+
+/* ── Custom chart tooltip ────────────────────────────────────────────────── */
+function ChartTooltip({ active, payload, label, unit = 'ms' }) {
+  if (!active || !payload?.length) return null;
+  return (
+    <div className="chart-tooltip">
+      <div className="ct-label">{label}</div>
+      <div className="ct-value">{payload[0].value} <span className="ct-unit">{unit}</span></div>
+    </div>
+  );
+}
+
+/* ── Copy URL button ─────────────────────────────────────────────────────── */
+function CopyButton({ text }) {
+  const [copied, setCopied] = useState(false);
+  const copy = () => {
+    navigator.clipboard.writeText(text).then(() => {
+      setCopied(true);
+      setTimeout(() => setCopied(false), 1800);
+    });
+  };
+  return (
+    <button className="copy-btn" onClick={copy} title="Copy API URL">
+      {copied ? (
+        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#34d399" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+          <polyline points="20 6 9 17 4 12"/>
+        </svg>
+      ) : (
+        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+          <rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/>
+        </svg>
+      )}
+      <span>{copied ? 'Copied' : 'Copy URL'}</span>
+    </button>
   );
 }
 
@@ -198,18 +276,15 @@ export default function Dashboard({ result }) {
     return () => clearInterval(iv);
   }, [running, done]);
 
-  const cards = [
-    { label: 'Avg Latency', value: result.avg_response_time, unit: 'ms', color: latencyColor(result.avg_response_time), sub: done ? `p95: ${result.p95_response_time ?? '—'} ms` : null },
-    { label: 'Throughput',  value: result.requests_per_sec,  unit: 'req/s', color: '#818cf8', sub: done ? `${result.total_requests ?? 0} total` : null },
-    { label: 'Error Rate',  value: result.error_rate, unit: '%', color: errorColor(result.error_rate), sub: done ? `${result.failed_requests ?? 0} failed` : null },
-    { label: 'Status', value: null, unit: '', color: statusColor(result.status, result.error_rate), statusText: statusLabel(result.status, result.error_rate), status: result.status, sub: result.api_url ? truncate(result.api_url, 32) : null },
-  ];
-
   const [errExpanded, setErrExpanded] = useState(false);
   const errorExamples = done && result.error_rate > 0 ? [
-    result.error_rate === 100 ? { code: '5xx / 0', msg: 'Connection refused or server error' } : { code: '429', msg: 'Too Many Requests — rate limit hit' },
+    result.error_rate === 100
+      ? { code: '5xx / 0', msg: 'Connection refused or server error' }
+      : { code: '429', msg: 'Too Many Requests — rate limit hit' },
     { code: 'Timeout', msg: `Request exceeded ${result.max_response_time ?? 2000}ms threshold` },
-    result.error_rate > 50 ? { code: '401 / 403', msg: 'Unauthorized — check auth headers' } : { code: '503', msg: 'Service temporarily unavailable' },
+    result.error_rate > 50
+      ? { code: '401 / 403', msg: 'Unauthorized — check auth headers' }
+      : { code: '503', msg: 'Service temporarily unavailable' },
   ].slice(0, Math.min(3, Math.ceil(result.failed_requests / 2) || 1)) : [];
 
   const percentileData = done ? [
@@ -226,10 +301,16 @@ export default function Dashboard({ result }) {
     { name: 'Max', value: result.max_response_time ?? 0 },
   ] : [];
 
+  const insights = done ? getInsights(result) : [];
+
+  // Last updated time
+  const updatedAt = result.timestamp
+    ? new Date(result.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' })
+    : null;
+
   // Export JSON
   const exportJSON = () => {
-    const report = buildReport(result);
-    const blob = new Blob([JSON.stringify(report, null, 2)], { type: 'application/json' });
+    const blob = new Blob([JSON.stringify(buildReport(result), null, 2)], { type: 'application/json' });
     triggerDownload(blob, `benchmark-${result.test_id?.slice(0,8) ?? 'report'}.json`);
   };
 
@@ -255,18 +336,20 @@ export default function Dashboard({ result }) {
     triggerDownload(blob, `benchmark-${r.test_id?.slice(0,8) ?? 'report'}.csv`);
   };
 
-  const insights = done ? getInsights(result) : [];
-
   return (
     <div className="dashboard fade-in">
 
-      {/* Status strip */}
+      {/* ── Status strip ──────────────────────────────────────────────── */}
       <div className={`status-strip ${result.status}${result.error_rate > 50 ? ' has-errors' : ''}`}>
         <div className="strip-left">
           {running && <span className="strip-spinner" />}
           <span className="strip-label">{statusLabel(result.status, result.error_rate)}</span>
+          {updatedAt && done && (
+            <span className="strip-updated">Updated {updatedAt}</span>
+          )}
         </div>
         <div className="strip-right">
+          {result.api_url && <CopyButton text={result.api_url} />}
           <span className="strip-url">{result.api_url || result.apiUrl || ''}</span>
           {done && (
             <div className="export-group">
@@ -277,25 +360,20 @@ export default function Dashboard({ result }) {
         </div>
       </div>
 
-      {/* Progress bar */}
+      {/* ── Progress bar ──────────────────────────────────────────────── */}
       {(running || done) && (
         <div className="progress-track">
           <div className={`progress-fill ${done ? 'done' : ''}`} style={{ width: `${progress}%` }} />
         </div>
       )}
 
-      {/* KPI strip — dominant numbers after completion */}
-      <KPIStrip result={result} />
+      {/* ── KPI strip — replaces metric cards, single source of truth ── */}
+      <KPIStrip result={result} running={running} />
 
-      {/* Live ticker + real-time graph */}
+      {/* ── Live ticker + real-time graph ─────────────────────────────── */}
       <LiveTicker running={running} done={done} />
 
-      {/* Metric cards */}
-      <div className="metrics-grid">
-        {cards.map(c => <MetricCard key={c.label} {...c} running={running} />)}
-      </div>
-
-      {/* Smart insights */}
+      {/* ── Smart insights ────────────────────────────────────────────── */}
       {done && insights.length > 0 && (
         <div className="insights-card fade-in">
           <div className="insights-header">Smart Analysis</div>
@@ -312,37 +390,76 @@ export default function Dashboard({ result }) {
         </div>
       )}
 
-      {/* Charts */}
+      {/* ── Charts ────────────────────────────────────────────────────── */}
       {done && (
         <div className="charts-row">
           <div className="chart-card">
             <div className="chart-header">
-              <h3 className="chart-title">Response Time</h3>
+              <div>
+                <h3 className="chart-title">Response Time</h3>
+                <p className="chart-subtitle">Min / Avg / Max latency in ms</p>
+              </div>
               <span className="chart-unit">ms</span>
             </div>
             <ResponsiveContainer width="100%" height={200}>
               <BarChart data={barData} margin={{ top: 8, right: 8, left: 0, bottom: 0 }}>
-                <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.08)" vertical={false} />
-                <XAxis dataKey="name" stroke="#a1a1aa" tick={{ fontSize: 12, fill: '#a1a1aa', fontWeight: 600 }} />
-                <YAxis stroke="#a1a1aa" tick={{ fontSize: 11, fill: '#a1a1aa' }} unit="ms" width={50} />
-                <Tooltip contentStyle={{ background: 'rgba(10,10,26,0.95)', border: '1px solid rgba(37,99,235,0.3)', borderRadius: '0.5rem', fontSize: '0.84rem' }} labelStyle={{ color: '#ffffff', fontWeight: 700 }} formatter={v => [`${v} ms`]} />
+                <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.06)" vertical={false} />
+                <XAxis
+                  dataKey="name"
+                  stroke="rgba(255,255,255,0.2)"
+                  tick={{ fontSize: 12, fill: '#e5e7eb', fontWeight: 600 }}
+                  axisLine={{ stroke: 'rgba(255,255,255,0.1)' }}
+                  tickLine={false}
+                />
+                <YAxis
+                  stroke="rgba(255,255,255,0.2)"
+                  tick={{ fontSize: 11, fill: '#a1a1aa' }}
+                  unit="ms"
+                  width={52}
+                  axisLine={false}
+                  tickLine={false}
+                />
+                <Tooltip content={<ChartTooltip unit="ms" />} cursor={{ fill: 'rgba(255,255,255,0.04)' }} />
                 <Bar dataKey="value" radius={[6,6,0,0]} maxBarSize={70}>
                   <Cell fill="#34d399" /><Cell fill="#818cf8" /><Cell fill="#f87171" />
                 </Bar>
               </BarChart>
             </ResponsiveContainer>
           </div>
+
           <div className="chart-card">
             <div className="chart-header">
-              <h3 className="chart-title">Latency Percentiles</h3>
+              <div>
+                <h3 className="chart-title">Latency Percentiles</h3>
+                <p className="chart-subtitle">p50 → p99 distribution</p>
+              </div>
               <span className="chart-unit">industry standard</span>
             </div>
             <ResponsiveContainer width="100%" height={200}>
               <BarChart data={percentileData} margin={{ top: 8, right: 8, left: 0, bottom: 0 }}>
-                <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.08)" vertical={false} />
-                <XAxis dataKey="name" stroke="#a1a1aa" tick={{ fontSize: 12, fill: '#a1a1aa', fontWeight: 600 }} />
-                <YAxis stroke="#a1a1aa" tick={{ fontSize: 11, fill: '#a1a1aa' }} unit="ms" width={50} />
-                <Tooltip contentStyle={{ background: 'rgba(10,10,26,0.95)', border: '1px solid rgba(37,99,235,0.3)', borderRadius: '0.5rem', fontSize: '0.84rem' }} labelStyle={{ color: '#ffffff', fontWeight: 700 }} formatter={v => [`${v} ms`]} />
+                <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.06)" vertical={false} />
+                <XAxis
+                  dataKey="name"
+                  stroke="rgba(255,255,255,0.2)"
+                  tick={{ fontSize: 12, fill: '#e5e7eb', fontWeight: 600 }}
+                  axisLine={{ stroke: 'rgba(255,255,255,0.1)' }}
+                  tickLine={false}
+                />
+                <YAxis
+                  stroke="rgba(255,255,255,0.2)"
+                  tick={{ fontSize: 11, fill: '#a1a1aa' }}
+                  unit="ms"
+                  width={52}
+                  axisLine={false}
+                  tickLine={false}
+                />
+                <Tooltip content={<ChartTooltip unit="ms" />} cursor={{ fill: 'rgba(255,255,255,0.04)' }} />
+                <ReferenceLine
+                  y={result.avg_response_time}
+                  stroke="rgba(129,140,248,0.4)"
+                  strokeDasharray="4 4"
+                  label={{ value: 'avg', fill: '#818cf8', fontSize: 10, position: 'insideTopRight' }}
+                />
                 <Bar dataKey="value" radius={[6,6,0,0]} maxBarSize={50} fill="#2563eb" />
               </BarChart>
             </ResponsiveContainer>
@@ -350,7 +467,7 @@ export default function Dashboard({ result }) {
         </div>
       )}
 
-      {/* Error details */}
+      {/* ── Error details ─────────────────────────────────────────────── */}
       {done && result.error_rate > 0 && (
         <div className="error-details-card">
           <div className="ed-header">
@@ -411,14 +528,6 @@ function errorColor(rate) {
   if (rate < 10) return '#f59e0b';
   return '#ef4444';
 }
-function statusColor(s, errorRate) {
-  if (s === 'completed') {
-    if (errorRate >= 100 || errorRate > 50) return '#f59e0b';
-    return '#10b981';
-  }
-  if (s === 'failed') return '#ef4444';
-  return '#2563eb';
-}
 function statusLabel(s, errorRate) {
   if (s === 'pending')   return 'Queued';
   if (s === 'running')   return 'Running';
@@ -431,9 +540,14 @@ function statusLabel(s, errorRate) {
   }
   return s;
 }
-function truncate(str, n) { return str && str.length > n ? str.slice(0, n) + '…' : str; }
 function buildReport(r) {
-  return { api_url: r.api_url, timestamp: r.timestamp, avg_response_time: r.avg_response_time, p95_response_time: r.p95_response_time, max_response_time: r.max_response_time, min_response_time: r.min_response_time, requests_per_sec: r.requests_per_sec, total_requests: r.total_requests, failed_requests: r.failed_requests, error_rate: r.error_rate, status: r.status };
+  return {
+    api_url: r.api_url, timestamp: r.timestamp,
+    avg_response_time: r.avg_response_time, p95_response_time: r.p95_response_time,
+    max_response_time: r.max_response_time, min_response_time: r.min_response_time,
+    requests_per_sec: r.requests_per_sec, total_requests: r.total_requests,
+    failed_requests: r.failed_requests, error_rate: r.error_rate, status: r.status,
+  };
 }
 function triggerDownload(blob, filename) {
   const a = document.createElement('a');
