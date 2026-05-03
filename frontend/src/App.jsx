@@ -49,11 +49,15 @@ export default function App() {
         setActiveTest(prev => ({ ...prev, ...data }));
         if (data.status === 'completed') {
           es.close();
-          showToast('Load test completed successfully.', 'success');
+          const errRate = data.error_rate ?? 0;
+          if (errRate >= 100)     showToast('All requests failed — check API availability.', 'error');
+          else if (errRate > 50)  showToast(`Test completed with ${errRate}% error rate — API may need auth.`, 'error');
+          else if (errRate > 5)   showToast(`Test completed — ${errRate}% error rate detected.`, 'info');
+          else                    showToast('Load test completed successfully.', 'success');
         }
         if (data.status === 'failed') {
           es.close();
-          showToast('Load test failed. Check worker logs.', 'error');
+          showToast('Load test failed to execute. Check worker logs.', 'error');
         }
       } catch {}
     };
