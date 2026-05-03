@@ -33,8 +33,8 @@
 
   /* Text — improved contrast */
   --text-1: #ffffff;
-  --text-2: #a1a1aa;
-  --text-3: #6b7280;
+  --text-2: #e5e7eb;
+  --text-3: #9ca3af;
 
   /* Semantic dims */
   --success-dim: rgba(16,185,129,0.12);

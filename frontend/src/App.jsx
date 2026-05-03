@@ -170,9 +170,12 @@ export default function App() {
     return () => es.close();
   }, [activeTest?.testId, showToast]);
 
+  const [formCollapsed, setFormCollapsed] = useState(false);
+
   const handleTestStart = (testData) => {
     setActiveTest({ ...testData, status: 'pending' });
     setView('home');
+    setFormCollapsed(true);   // auto-collapse form so results are prominent
     showToast('Load test queued.', 'info');
   };
 
@@ -262,10 +265,30 @@ export default function App() {
           <ErrorBoundary>
             {view === 'home' && (
               <div className="home-layout">
-                <BenchmarkForm
-                  onTestStart={handleTestStart}
-                  disabled={backendStatus === 'down'}
-                />
+                <div className={`form-collapse-wrap ${formCollapsed ? 'collapsed' : ''}`}>
+                  <div className="form-collapse-bar">
+                    <span className="form-collapse-label">
+                      {formCollapsed ? 'Configure Load Test' : 'Configure Load Test'}
+                    </span>
+                    <button
+                      className="form-collapse-toggle"
+                      onClick={() => setFormCollapsed(v => !v)}
+                      aria-label={formCollapsed ? 'Show config' : 'Hide config'}
+                    >
+                      {formCollapsed ? 'Show Config' : 'Hide Config'}
+                      <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"
+                        style={{ transform: formCollapsed ? 'rotate(180deg)' : 'rotate(0deg)', transition: 'transform 0.2s ease' }}>
+                        <polyline points="6 9 12 15 18 9"/>
+                      </svg>
+                    </button>
+                  </div>
+                  {!formCollapsed && (
+                    <BenchmarkForm
+                      onTestStart={handleTestStart}
+                      disabled={backendStatus === 'down'}
+                    />
+                  )}
+                </div>
                 {activeTest && <Dashboard result={activeTest} />}
               </div>
             )}
