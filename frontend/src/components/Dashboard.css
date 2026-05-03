@@ -195,3 +195,59 @@
 .failed-box strong { display: block; margin-bottom: 0.25rem; }
 .failed-box p      { color: var(--text-3); line-height: 1.5; }
 .failed-box code   { background: rgba(255,255,255,0.06); padding: 0.1rem 0.4rem; border-radius: 0.25rem; font-size: 0.78rem; }
+
+/* ── KPI Strip ───────────────────────────────────────────────────────────── */
+.kpi-strip {
+  display: flex; align-items: center; justify-content: space-around;
+  background: rgba(255,255,255,0.04); backdrop-filter: blur(12px);
+  border: 1px solid rgba(255,255,255,0.1); border-radius: var(--radius-lg);
+  padding: 1.25rem 1.5rem; flex-wrap: wrap; gap: 0.5rem;
+}
+.kpi-item { display: flex; flex-direction: column; align-items: center; gap: 0.25rem; flex: 1; min-width: 80px; }
+.kpi-label { font-size: 0.7rem; font-weight: 700; color: #6b7280; text-transform: uppercase; letter-spacing: 0.07em; }
+.kpi-value { font-size: 1.75rem; font-weight: 900; line-height: 1; }
+.kpi-unit  { font-size: 0.8rem; font-weight: 500; color: #a1a1aa; margin-left: 0.15rem; }
+.kpi-divider { width: 1px; height: 40px; background: rgba(255,255,255,0.08); flex-shrink: 0; }
+@media (max-width: 700px) { .kpi-divider { display: none; } }
+
+/* ── Live section (ticker + graph) ──────────────────────────────────────── */
+.live-section { display: flex; flex-direction: column; gap: 0.5rem; }
+.live-graph { background: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.07); border-radius: var(--radius); padding: 0.5rem 0.75rem; }
+.live-graph-title { font-size: 0.7rem; color: #6b7280; font-weight: 600; text-transform: uppercase; letter-spacing: 0.06em; margin-bottom: 0.25rem; }
+
+/* ── Export group ────────────────────────────────────────────────────────── */
+.export-group { display: flex; gap: 0.4rem; }
+.export-btn {
+  background: rgba(255,255,255,0.06); border: 1px solid rgba(255,255,255,0.12);
+  color: #a1a1aa; padding: 0.3rem 0.7rem; border-radius: var(--radius-sm);
+  font-size: 0.75rem; font-weight: 600; cursor: pointer; transition: all 0.15s;
+  letter-spacing: 0.03em;
+}
+.export-btn:hover { background: rgba(37,99,235,0.15); border-color: rgba(37,99,235,0.4); color: #93c5fd; }
+
+/* ── Smart Insights ──────────────────────────────────────────────────────── */
+.insights-card {
+  background: rgba(255,255,255,0.03); backdrop-filter: blur(12px);
+  border: 1px solid rgba(255,255,255,0.08); border-radius: var(--radius-lg); overflow: hidden;
+}
+.insights-header {
+  padding: 0.65rem 1.25rem; background: rgba(255,255,255,0.04);
+  font-size: 0.75rem; font-weight: 800; color: #a1a1aa;
+  text-transform: uppercase; letter-spacing: 0.08em;
+  border-bottom: 1px solid rgba(255,255,255,0.06);
+}
+.insights-list { padding: 0.25rem 0; }
+.insight-row {
+  display: flex; align-items: flex-start; gap: 0.75rem;
+  padding: 0.6rem 1.25rem; font-size: 0.83rem;
+  border-bottom: 1px solid rgba(255,255,255,0.04);
+}
+.insight-row:last-child { border-bottom: none; }
+.insight-icon { font-size: 0.75rem; font-weight: 900; width: 16px; flex-shrink: 0; margin-top: 0.1rem; }
+.insight-msg  { color: #a1a1aa; line-height: 1.5; }
+.insight-ok   .insight-icon { color: #34d399; }
+.insight-ok   .insight-msg  { color: #d1fae5; }
+.insight-warn .insight-icon { color: #fbbf24; }
+.insight-warn .insight-msg  { color: #fef3c7; }
+.insight-error .insight-icon { color: #f87171; }
+.insight-error .insight-msg  { color: #fee2e2; }

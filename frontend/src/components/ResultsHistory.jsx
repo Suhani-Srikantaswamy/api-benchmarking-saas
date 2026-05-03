@@ -1,10 +1,13 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import './ResultsHistory.css';
 
 export default function ResultsHistory({ onCompare }) {
   const [results, setResults] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error,   setError]   = useState('');
+  const [search,  setSearch]  = useState('');
+  const [filter,  setFilter]  = useState('all');  // all | completed | failed | pending
+  const [sortBy,  setSortBy]  = useState('time'); // time | latency | errors
 
   const fetchResults = async () => {
     setLoading(true);
@@ -22,33 +25,72 @@ export default function ResultsHistory({ onCompare }) {
 
   useEffect(() => { fetchResults(); }, []);
 
+  const filtered = useMemo(() => {
+    let list = [...results];
+    if (filter !== 'all') list = list.filter(r => r.status === filter);
+    if (search.trim())    list = list.filter(r => r.api_url?.toLowerCase().includes(search.toLowerCase()));
+    if (sortBy === 'latency') list.sort((a, b) => (a.avg_response_time ?? 0) - (b.avg_response_time ?? 0));
+    if (sortBy === 'errors')  list.sort((a, b) => (b.error_rate ?? 0) - (a.error_rate ?? 0));
+    return list;
+  }, [results, filter, search, sortBy]);
+
   return (
     <div className="history-wrap fade-in">
       <div className="history-header">
         <div>
           <h2 className="history-title">Test History</h2>
-          <p className="history-sub">{results.length} test{results.length !== 1 ? 's' : ''} recorded</p>
+          <p className="history-sub">{filtered.length} of {results.length} tests</p>
         </div>
-        <button className="refresh-btn" onClick={fetchResults} disabled={loading}>
-          {loading ? 'Loading...' : 'Refresh'}
-        </button>
-        {results.length >= 2 && onCompare && (
-          <button className="refresh-btn compare-btn" onClick={onCompare}>
-            Compare
+        <div className="history-actions">
+          <button className="refresh-btn" onClick={fetchResults} disabled={loading}>
+            {loading ? 'Loading...' : 'Refresh'}
           </button>
-        )}
+          {results.length >= 2 && onCompare && (
+            <button className="refresh-btn compare-btn" onClick={onCompare}>Compare</button>
+          )}
+        </div>
+      </div>
+
+      {/* Filters */}
+      <div className="history-filters">
+        <input
+          className="filter-search"
+          type="text"
+          placeholder="Search by URL..."
+          value={search}
+          onChange={e => setSearch(e.target.value)}
+        />
+        <div className="filter-tabs">
+          {['all','completed','failed','pending'].map(f => (
+            <button key={f} className={`filter-tab ${filter === f ? 'active' : ''}`} onClick={() => setFilter(f)}>
+              {f.charAt(0).toUpperCase() + f.slice(1)}
+            </button>
+          ))}
+        </div>
+        <select className="sort-select" value={sortBy} onChange={e => setSortBy(e.target.value)}>
+          <option value="time">Sort: Latest</option>
+          <option value="latency">Sort: Latency</option>
+          <option value="errors">Sort: Error Rate</option>
+        </select>
       </div>
 
       {error && <div className="history-error">{error}</div>}
 
       {!loading && !error && results.length === 0 && (
         <div className="history-empty">
-          <p>No tests recorded yet.</p>
-          <p>Run your first load test from the Dashboard.</p>
+          <p className="empty-title">No tests recorded yet</p>
+          <p className="empty-sub">Run your first load test from the Dashboard.</p>
         </div>
       )}
 
-      {results.length > 0 && (
+      {!loading && !error && results.length > 0 && filtered.length === 0 && (
+        <div className="history-empty">
+          <p className="empty-title">No results match your filter</p>
+          <p className="empty-sub">Try changing the status filter or search term.</p>
+        </div>
+      )}
+
+      {filtered.length > 0 && (
         <div className="table-wrap">
           <table className="results-table" aria-label="Benchmark results">
             <thead>
@@ -63,7 +105,7 @@ export default function ResultsHistory({ onCompare }) {
               </tr>
             </thead>
             <tbody>
-              {results.map((r) => (
+              {filtered.map((r) => (
                 <tr key={r.test_id}>
                   <td className="url-cell" title={r.api_url}>{truncate(r.api_url, 42)}</td>
                   <td className="num-cell">{r.avg_response_time ?? '—'}</td>
