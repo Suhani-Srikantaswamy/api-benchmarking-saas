@@ -1,16 +1,18 @@
 # Dependencies
 node_modules/
 
-# Environment files
+# Environment files — NEVER commit real secrets
 .env
 .env.local
 .env.production
+.env.staging
+*.env
 
 # Build output
 dist/
 build/
 
-# Terraform state and local files
+# Terraform state and local files — contain real infra state
 .terraform/
 terraform.tfstate
 terraform.tfstate.backup
@@ -35,3 +37,8 @@ Thumbs.db
 
 # Test coverage
 coverage/
+
+# Kubernetes secrets with real values — apply directly with kubectl, never commit
+# k8s/secrets.yaml is committed as a TEMPLATE only (no real values)
+kubeconfig
+*.kubeconfig
