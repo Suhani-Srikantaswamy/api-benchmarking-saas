@@ -11,7 +11,7 @@ services:
     environment:
       POSTGRES_DB:       benchmarkdb
       POSTGRES_USER:     postgres
-      POSTGRES_PASSWORD: postgres
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-postgres}
     volumes:
       - postgres_data:/var/lib/postgresql/data
     ports:
@@ -54,7 +54,7 @@ services:
       DB_PORT:        5432
       DB_NAME:        benchmarkdb
       DB_USER:        postgres
-      DB_PASSWORD:    postgres
+      DB_PASSWORD:    ${POSTGRES_PASSWORD:-postgres}
       REDIS_HOST:     redis
       REDIS_PORT:     6379
       JWT_SECRET:     ${JWT_SECRET:-change-this-in-production}
@@ -94,7 +94,7 @@ services:
       DB_PORT:     5432
       DB_NAME:     benchmarkdb
       DB_USER:     postgres
-      DB_PASSWORD: postgres
+      DB_PASSWORD: ${POSTGRES_PASSWORD:-postgres}
       REDIS_HOST:  redis
       REDIS_PORT:  6379
       LOG_LEVEL:   info
@@ -153,7 +153,7 @@ services:
     restart: unless-stopped
     environment:
       GF_SECURITY_ADMIN_USER:     admin
-      GF_SECURITY_ADMIN_PASSWORD: admin123
+      GF_SECURITY_ADMIN_PASSWORD: ${GRAFANA_PASSWORD:-admin}
       GF_USERS_ALLOW_SIGN_UP:     "false"
     volumes:
       - grafana_data:/var/lib/grafana
