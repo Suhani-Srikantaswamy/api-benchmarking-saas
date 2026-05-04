@@ -1,37 +1,29 @@
 name: Terraform CI/CD
 
-# Runs on manual trigger or when terraform files change.
-# Plan/Apply/Destroy require KUBE_CONFIG secret to be set.
-# For local/Minikube usage, run terraform commands directly from your terminal.
-
 on:
   workflow_dispatch:
     inputs:
       action:
-        description: 'Terraform action to run'
+        description: 'Terraform action'
         required: true
         default: 'plan'
         type: choice
-        options:
-          - plan
-          - apply
-          - destroy
+        options: [plan, apply, destroy]
 
   push:
     branches: [main]
-    paths:
-      - 'terraform/**'
+    paths: ['terraform/**']
+
   pull_request:
     branches: [main]
-    paths:
-      - 'terraform/**'
+    paths: ['terraform/**']
 
 env:
   TF_VERSION: '1.5.7'
   WORKING_DIR: './terraform'
 
 jobs:
-  # ── Validate (syntax + format check — no provider connection needed) ──────────
+
   validate:
     name: Validate Terraform
     runs-on: ubuntu-latest
@@ -43,8 +35,7 @@ jobs:
         with:
           terraform_version: ${{ env.TF_VERSION }}
 
-      # Use -backend=false so no provider/cluster connection is needed
-      - name: Terraform Init (no backend)
+      - name: Terraform Init
         run: terraform init -backend=false -input=false
         working-directory: ${{ env.WORKING_DIR }}
 
@@ -52,13 +43,11 @@ jobs:
         run: terraform validate
         working-directory: ${{ env.WORKING_DIR }}
 
-      # Format check is informational only — does not fail the pipeline
       - name: Terraform Format Check
-        run: terraform fmt -check -recursive || echo "⚠ Some files need formatting (run: terraform fmt)"
+        run: terraform fmt -check -recursive || echo "Some files need formatting (run terraform fmt locally)"
         working-directory: ${{ env.WORKING_DIR }}
         continue-on-error: true
 
-  # ── Plan (manual trigger or PR) ───────────────────────────────────────────────
   plan:
     name: Terraform Plan
     runs-on: ubuntu-latest
@@ -89,7 +78,6 @@ jobs:
             -no-color
         working-directory: ${{ env.WORKING_DIR }}
 
-  # ── Apply (manual trigger only) ───────────────────────────────────────────────
   apply:
     name: Terraform Apply
     runs-on: ubuntu-latest
@@ -121,7 +109,6 @@ jobs:
             -auto-approve -no-color
         working-directory: ${{ env.WORKING_DIR }}
 
-  # ── Destroy (manual trigger only) ─────────────────────────────────────────────
   destroy:
     name: Terraform Destroy
     runs-on: ubuntu-latest
