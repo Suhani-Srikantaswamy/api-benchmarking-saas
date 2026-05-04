@@ -10,10 +10,11 @@ const { authLimiter } = require('../middleware/rateLimiter');
 
 const router = express.Router();
 
-// Demo users — in production use DB with hashed passwords
+// Demo users — in production replace with DB + bcrypt hashed passwords
+// Override via DEMO_ADMIN_PASSWORD and DEMO_USER_PASSWORD env vars
 const DEMO_USERS = {
-  'admin': { password: 'admin123', role: 'admin' },
-  'demo':  { password: 'demo123',  role: 'user'  },
+  'admin': { password: process.env.DEMO_ADMIN_PASSWORD || 'admin123', role: 'admin' },
+  'demo':  { password: process.env.DEMO_USER_PASSWORD  || 'demo123',  role: 'user'  },
 };
 
 /**
