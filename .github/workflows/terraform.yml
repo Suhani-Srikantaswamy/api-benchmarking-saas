@@ -1,11 +1,10 @@
 name: Terraform CI/CD
 
-# This workflow runs ONLY when manually triggered or when terraform files change.
-# It requires KUBE_CONFIG secret to be set for plan/apply/destroy jobs.
+# Runs on manual trigger or when terraform files change.
+# Plan/Apply/Destroy require KUBE_CONFIG secret to be set.
 # For local/Minikube usage, run terraform commands directly from your terminal.
 
 on:
-  # Manual trigger only — prevents failures when no cluster is configured
   workflow_dispatch:
     inputs:
       action:
@@ -18,7 +17,6 @@ on:
           - apply
           - destroy
 
-  # Also runs on PR/push ONLY if terraform files actually changed
   push:
     branches: [main]
     paths:
@@ -29,11 +27,11 @@ on:
       - 'terraform/**'
 
 env:
-  TF_VERSION: '1.14.9'
+  TF_VERSION: '1.5.7'
   WORKING_DIR: './terraform'
 
 jobs:
-  # ── Validate (syntax check only — no provider connection) ────────────────────
+  # ── Validate (syntax + format check — no provider connection needed) ──────────
   validate:
     name: Validate Terraform
     runs-on: ubuntu-latest
@@ -45,11 +43,6 @@ jobs:
         with:
           terraform_version: ${{ env.TF_VERSION }}
 
-      - name: Terraform Format Check
-        run: terraform fmt -check -recursive
-        working-directory: ${{ env.WORKING_DIR }}
-        continue-on-error: true
-
       # Use -backend=false so no provider/cluster connection is needed
       - name: Terraform Init (no backend)
         run: terraform init -backend=false -input=false
@@ -59,7 +52,13 @@ jobs:
         run: terraform validate
         working-directory: ${{ env.WORKING_DIR }}
 
-  # ── Plan (manual trigger only) ────────────────────────────────────────────────
+      # Format check is informational only — does not fail the pipeline
+      - name: Terraform Format Check
+        run: terraform fmt -check -recursive || echo "⚠ Some files need formatting (run: terraform fmt)"
+        working-directory: ${{ env.WORKING_DIR }}
+        continue-on-error: true
+
+  # ── Plan (manual trigger or PR) ───────────────────────────────────────────────
   plan:
     name: Terraform Plan
     runs-on: ubuntu-latest
