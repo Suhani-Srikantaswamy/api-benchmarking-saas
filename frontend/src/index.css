@@ -3,45 +3,45 @@
 
 /* ── Design Tokens ───────────────────────────────────────────────────────── */
 :root {
-  /* ── Background layers (3-level elevation system) ── */
-  --bg-base:      #0B0F17;   /* main page background */
-  --bg-card:      #111827;   /* card / panel surface  */
-  --bg-elevated:  #1F2937;   /* hover / elevated card */
-  --bg-sidebar:   #070B12;   /* sidebar — darkest     */
-  --bg-input:     #161D2B;   /* input fields          */
+  /* ── Background layers — clear 3-level elevation ── */
+  --bg-base:      #020617;   /* page — near black          */
+  --bg-card:      #0F172A;   /* card surface               */
+  --bg-elevated:  #1E293B;   /* hover / section header     */
+  --bg-sidebar:   #020617;   /* sidebar — same as base     */
+  --bg-input:     #0B1220;   /* inputs — darker than card  */
 
-  /* ── Accent colors (semantic, not decorative) ── */
-  --accent:        #3B82F6;  /* primary action — blue  */
+  /* ── Accent colors (semantic only) ── */
+  --accent:        #3B82F6;
   --accent-hover:  #2563EB;
   --accent-dim:    rgba(59,130,246,0.12);
-  --accent-border: rgba(59,130,246,0.25);
+  --accent-border: rgba(59,130,246,0.28);
 
   --success:       #22C55E;
   --success-dim:   rgba(34,197,94,0.12);
-  --success-border:rgba(34,197,94,0.25);
+  --success-border:rgba(34,197,94,0.28);
 
   --warning:       #F59E0B;
   --warning-dim:   rgba(245,158,11,0.12);
-  --warning-border:rgba(245,158,11,0.25);
+  --warning-border:rgba(245,158,11,0.28);
 
   --danger:        #EF4444;
   --danger-dim:    rgba(239,68,68,0.12);
-  --danger-border: rgba(239,68,68,0.25);
+  --danger-border: rgba(239,68,68,0.28);
 
   /* ── Text hierarchy ── */
-  --text-1: #F9FAFB;   /* primary — headings, values */
-  --text-2: #D1D5DB;   /* secondary — labels, body   */
-  --text-3: #6B7280;   /* muted — hints, timestamps  */
+  --text-1: #F1F5F9;   /* primary   — headings, values, input text */
+  --text-2: #CBD5E1;   /* secondary — body text, descriptions      */
+  --text-3: #94A3B8;   /* muted     — hints, timestamps, placeholders */
 
-  /* ── Borders ── */
-  --border:        rgba(255,255,255,0.08);
-  --border-bright: rgba(255,255,255,0.14);
+  /* ── Borders — solid, not rgba ── */
+  --border:        #1E293B;
+  --border-bright: #334155;
 
-  /* ── Legacy aliases (keep for components that reference them) ── */
+  /* ── Legacy aliases ── */
   --glass:        rgba(255,255,255,0.04);
   --glass-hover:  rgba(255,255,255,0.07);
   --glass-active: rgba(59,130,246,0.15);
-  --glass-border: rgba(255,255,255,0.08);
+  --glass-border: #1E293B;
   --neon-purple:  #3B82F6;
   --neon-blue:    #60A5FA;
   --neon-green:   #22C55E;
@@ -54,10 +54,11 @@
   --radius-lg: 1rem;
   --radius-xl: 1.25rem;
 
-  /* ── Shadows ── */
-  --shadow:    0 4px 24px rgba(0,0,0,0.5);
-  --shadow-sm: 0 2px 12px rgba(0,0,0,0.4);
-  --shadow-lg: 0 8px 40px rgba(0,0,0,0.65);
+  /* ── Shadows — stronger for real elevation ── */
+  --shadow:    0 10px 30px rgba(0,0,0,0.45);
+  --shadow-sm: 0 4px 16px rgba(0,0,0,0.35);
+  --shadow-lg: 0 16px 48px rgba(0,0,0,0.65);
+  --shadow-card: 0 10px 30px rgba(0,0,0,0.35), 0 1px 0 rgba(255,255,255,0.04) inset;
 }
 
 /* ── Base ────────────────────────────────────────────────────────────────── */
@@ -65,29 +66,22 @@ html { scroll-behavior: smooth; }
 
 body {
   font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
-  background-color: var(--bg-base);
+  /* Radial gradient gives premium depth without being flashy */
+  background:
+    radial-gradient(circle at 20% 20%, rgba(59,130,246,0.07) 0%, transparent 40%),
+    #020617;
+  background-attachment: fixed;
   color: var(--text-1);
   min-height: 100vh;
   line-height: 1.6;
   -webkit-font-smoothing: antialiased;
 }
 
-/* Subtle background accent — single, restrained */
-body::before {
-  content: '';
-  position: fixed;
-  width: 700px; height: 700px;
-  background: radial-gradient(circle, rgba(59,130,246,0.06) 0%, transparent 65%);
-  top: -250px; right: -200px;
-  pointer-events: none;
-  z-index: 0;
-}
-
 /* ── Scrollbar ───────────────────────────────────────────────────────────── */
 ::-webkit-scrollbar { width: 5px; }
 ::-webkit-scrollbar-track { background: transparent; }
-::-webkit-scrollbar-thumb { background: #1F2937; border-radius: 3px; }
-::-webkit-scrollbar-thumb:hover { background: #374151; }
+::-webkit-scrollbar-thumb { background: #1E293B; border-radius: 3px; }
+::-webkit-scrollbar-thumb:hover { background: #334155; }
 
 /* ── Animations ──────────────────────────────────────────────────────────── */
 @keyframes spin    { to { transform: rotate(360deg); } }

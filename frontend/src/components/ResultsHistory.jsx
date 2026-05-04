@@ -1,13 +1,59 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import './ResultsHistory.css';
 
+/* ── Skeleton row ────────────────────────────────────────────────────────── */
+function SkeletonRow() {
+  return (
+    <tr className="skeleton-row">
+      <td><span className="skel skel-url" /></td>
+      <td><span className="skel skel-num" /></td>
+      <td><span className="skel skel-num" /></td>
+      <td><span className="skel skel-num" /></td>
+      <td><span className="skel skel-num" /></td>
+      <td><span className="skel skel-badge" /></td>
+      <td><span className="skel skel-time" /></td>
+    </tr>
+  );
+}
+
+/* ── Empty state ─────────────────────────────────────────────────────────── */
+function EmptyState({ filtered }) {
+  if (filtered) {
+    return (
+      <div className="history-empty">
+        <svg width="36" height="36" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" style={{ color: 'var(--text-3)' }}>
+          <circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/>
+        </svg>
+        <p className="empty-title">No results match your filter</p>
+        <p className="empty-sub">Try changing the status filter or search term.</p>
+      </div>
+    );
+  }
+  return (
+    <div className="history-empty history-empty-first">
+      <div className="empty-icon-wrap">
+        <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+          <polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/>
+        </svg>
+      </div>
+      <p className="empty-title">No tests run yet</p>
+      <p className="empty-sub">Head to the Dashboard, enter an API URL and click <strong>Run Load Test</strong> to get started.</p>
+      <div className="empty-steps">
+        <div className="empty-step"><span className="step-num">1</span><span>Enter an API endpoint URL</span></div>
+        <div className="empty-step"><span className="step-num">2</span><span>Choose VUs and duration</span></div>
+        <div className="empty-step"><span className="step-num">3</span><span>View live results here</span></div>
+      </div>
+    </div>
+  );
+}
+
 export default function ResultsHistory({ onCompare }) {
   const [results, setResults] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error,   setError]   = useState('');
   const [search,  setSearch]  = useState('');
-  const [filter,  setFilter]  = useState('all');  // all | completed | failed | pending
-  const [sortBy,  setSortBy]  = useState('time'); // time | latency | errors
+  const [filter,  setFilter]  = useState('all');
+  const [sortBy,  setSortBy]  = useState('time');
 
   const fetchResults = async () => {
     setLoading(true);
@@ -28,7 +74,10 @@ export default function ResultsHistory({ onCompare }) {
   const filtered = useMemo(() => {
     let list = [...results];
     if (filter !== 'all') list = list.filter(r => r.status === filter);
-    if (search.trim())    list = list.filter(r => r.api_url?.toLowerCase().includes(search.toLowerCase()));
+    if (search.trim())    list = list.filter(r =>
+      r.api_url?.toLowerCase().includes(search.toLowerCase()) ||
+      r.test_name?.toLowerCase().includes(search.toLowerCase())
+    );
     if (sortBy === 'latency') list.sort((a, b) => (a.avg_response_time ?? 0) - (b.avg_response_time ?? 0));
     if (sortBy === 'errors')  list.sort((a, b) => (b.error_rate ?? 0) - (a.error_rate ?? 0));
     return list;
@@ -39,7 +88,9 @@ export default function ResultsHistory({ onCompare }) {
       <div className="history-header">
         <div>
           <h2 className="history-title">Test History</h2>
-          <p className="history-sub">{filtered.length} of {results.length} tests</p>
+          <p className="history-sub">
+            {loading ? 'Loading…' : `${filtered.length} of ${results.length} tests`}
+          </p>
         </div>
         <div className="history-actions">
           <button className="refresh-btn" onClick={fetchResults} disabled={loading}>
@@ -56,7 +107,7 @@ export default function ResultsHistory({ onCompare }) {
         <input
           className="filter-search"
           type="text"
-          placeholder="Search by URL..."
+          placeholder="Search by URL or test name..."
           value={search}
           onChange={e => setSearch(e.target.value)}
         />
@@ -76,26 +127,34 @@ export default function ResultsHistory({ onCompare }) {
 
       {error && <div className="history-error">{error}</div>}
 
-      {!loading && !error && results.length === 0 && (
-        <div className="history-empty">
-          <p className="empty-title">No tests recorded yet</p>
-          <p className="empty-sub">Run your first load test from the Dashboard.</p>
+      {/* Skeleton loading */}
+      {loading && (
+        <div className="table-wrap">
+          <table className="results-table" aria-label="Loading benchmark results">
+            <thead>
+              <tr>
+                <th>API URL</th><th>Avg (ms)</th><th>Req/s</th>
+                <th>Requests</th><th>Error Rate</th><th>Status</th><th>Time</th>
+              </tr>
+            </thead>
+            <tbody>
+              {[...Array(5)].map((_, i) => <SkeletonRow key={i} />)}
+            </tbody>
+          </table>
         </div>
       )}
 
-      {!loading && !error && results.length > 0 && filtered.length === 0 && (
-        <div className="history-empty">
-          <p className="empty-title">No results match your filter</p>
-          <p className="empty-sub">Try changing the status filter or search term.</p>
-        </div>
-      )}
+      {/* Empty states */}
+      {!loading && !error && results.length === 0 && <EmptyState filtered={false} />}
+      {!loading && !error && results.length > 0 && filtered.length === 0 && <EmptyState filtered={true} />}
 
-      {filtered.length > 0 && (
+      {/* Results table */}
+      {!loading && filtered.length > 0 && (
         <div className="table-wrap">
           <table className="results-table" aria-label="Benchmark results">
             <thead>
               <tr>
-                <th>API URL</th>
+                <th>Test / URL</th>
                 <th>Avg (ms)</th>
                 <th>Req/s</th>
                 <th>Requests</th>
@@ -107,7 +166,10 @@ export default function ResultsHistory({ onCompare }) {
             <tbody>
               {filtered.map((r) => (
                 <tr key={r.test_id}>
-                  <td className="url-cell" title={r.api_url}>{truncate(r.api_url, 42)}</td>
+                  <td className="url-cell" title={r.api_url}>
+                    {r.test_name && <span className="test-name-badge">{r.test_name}</span>}
+                    {truncate(r.api_url, 38)}
+                  </td>
                   <td className="num-cell">{r.avg_response_time ?? '—'}</td>
                   <td className="num-cell">{r.requests_per_sec ?? '—'}</td>
                   <td className="num-cell">{r.total_requests ?? '—'}</td>
