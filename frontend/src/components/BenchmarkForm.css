@@ -5,6 +5,7 @@
   border-radius: var(--radius-xl);
   overflow: hidden;
   transition: border-color 0.2s ease;
+  box-shadow: var(--shadow-card);
 }
 .form-card:hover { border-color: var(--border-bright); }
 
@@ -14,39 +15,51 @@
 }
 
 .form-title    { font-size: 1rem; font-weight: 700; color: var(--text-1); margin-bottom: 0.15rem; letter-spacing: -0.01em; }
-.form-subtitle { font-size: 0.8rem; color: var(--text-3); }
+.form-subtitle { font-size: 0.8rem; color: var(--text-2); }
 
 .form-body {
   padding: 1.25rem 1.5rem;
-  display: flex; flex-direction: column; gap: 1.1rem;
+  display: flex; flex-direction: column; gap: 0;
 }
 
 /* ── Fields ──────────────────────────────────────────────────────────────── */
 .field { display: flex; flex-direction: column; gap: 0.35rem; }
 
+/* Section separator between each field group */
+.field + .field,
+.field + .fields-row,
+.fields-row + .field,
+.fields-row + .fields-row,
+.field + .advanced-section,
+.fields-row + .advanced-section {
+  border-top: 1px solid var(--border);
+  padding-top: 1.1rem;
+  margin-top: 1.1rem;
+}
+
 .field-label {
-  font-size: 0.72rem; font-weight: 700; color: var(--text-2);
+  font-size: 0.72rem; font-weight: 700; color: #CBD5E1;
   display: flex; align-items: center; gap: 0.5rem;
-  text-transform: uppercase; letter-spacing: 0.07em;
+  text-transform: uppercase; letter-spacing: 0.05em;
 }
 
 .input {
   background: var(--bg-input);
-  border: 1px solid var(--border);
+  border: 1px solid #243044;
   border-radius: var(--radius-sm);
   padding: 0.65rem 0.9rem;
-  color: var(--text-1); font-size: 0.88rem;
+  color: #F1F5F9; font-size: 0.88rem;
   transition: all 0.18s ease; width: 100%;
 }
-.input::placeholder { color: var(--text-3); }
+.input::placeholder { color: #64748B; }
 .input:focus {
   outline: none;
   border-color: var(--accent);
-  box-shadow: 0 0 0 3px rgba(59,130,246,0.12);
-  background: #1A2540;
+  box-shadow: 0 0 0 2px rgba(59,130,246,0.2);
+  background: #0D1829;
 }
 .input:disabled { opacity: 0.38; cursor: not-allowed; }
-.input-error    { border-color: var(--danger) !important; box-shadow: 0 0 0 3px rgba(239,68,68,0.1) !important; }
+.input-error    { border-color: var(--danger) !important; box-shadow: 0 0 0 2px rgba(239,68,68,0.15) !important; }
 
 .textarea-mono {
   font-family: 'Fira Code', 'Cascadia Code', monospace;
@@ -62,7 +75,7 @@
 .quick-urls { display: flex; flex-wrap: wrap; gap: 0.35rem; margin-top: 0.25rem; }
 .chip {
   background: var(--bg-elevated); border: 1px solid var(--border);
-  color: var(--text-3); padding: 0.22rem 0.65rem;
+  color: #94A3B8; padding: 0.22rem 0.65rem;
   border-radius: 2rem; font-size: 0.72rem; cursor: pointer;
   transition: all 0.18s ease; white-space: nowrap;
 }
@@ -79,9 +92,9 @@
   border-radius: var(--radius); cursor: pointer; transition: all 0.18s ease;
 }
 .preset-btn:hover:not(:disabled) { border-color: var(--accent-border); background: #1A2540; transform: translateY(-1px); }
-.preset-btn.active { border-color: var(--accent); background: #1A2540; box-shadow: 0 0 0 1px var(--accent-border); }
+.preset-btn.active { border-color: #3B82F6; background: #0D1829; box-shadow: 0 0 0 1px #3B82F6, 0 0 12px rgba(59,130,246,0.2); }
 .preset-name { font-size: 0.82rem; font-weight: 700; color: var(--text-1); }
-.preset-desc { font-size: 0.68rem; color: var(--text-3); }
+.preset-desc { font-size: 0.68rem; color: #94A3B8; }
 .preset-btn:disabled { opacity: 0.3; cursor: not-allowed; }
 
 /* ── 3-column row ────────────────────────────────────────────────────────── */
@@ -94,10 +107,10 @@
   display: flex; align-items: center; gap: 0.35rem;
   padding: 0.4rem 0.8rem;
   background: var(--bg-elevated); border: 1px solid var(--border);
-  border-radius: var(--radius-sm); color: var(--text-3);
+  border-radius: var(--radius-sm); color: #94A3B8;
   font-size: 0.78rem; cursor: pointer; transition: all 0.18s ease; white-space: nowrap;
 }
-.auth-tab:hover:not(:disabled) { border-color: var(--border-bright); color: var(--text-2); }
+.auth-tab:hover:not(:disabled) { border-color: var(--border-bright); color: var(--text-1); }
 .auth-tab.active { background: #1A2540; border-color: var(--accent); color: #93C5FD; font-weight: 600; }
 .auth-tab:disabled { opacity: 0.3; cursor: not-allowed; }
 
@@ -243,4 +256,5 @@
   display: flex; flex-direction: column; gap: 0.9rem;
   background: var(--bg-card);
 }
-.field-hint { font-size: 0.7rem; color: var(--text-3); margin-top: 0.18rem; }
+.field-hint { font-size: 0.7rem; color: #94A3B8; margin-top: 0.18rem; }
+.field-hint-warn { color: #FCD34D; }

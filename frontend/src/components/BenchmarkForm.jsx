@@ -56,6 +56,7 @@ function ChevronIcon({ open }) {
 
 export default function BenchmarkForm({ onTestStart, disabled }) {
   const [apiUrl,     setApiUrl]     = useState('');
+  const [testName,   setTestName]   = useState('');
   const [vus,        setVus]        = useState(10);
   const [duration,   setDuration]   = useState('10s');
   const [method,     setMethod]     = useState('GET');
@@ -84,6 +85,7 @@ export default function BenchmarkForm({ onTestStart, disabled }) {
   // ── Apply a saved template ────────────────────────────────────────────────
   const applyTemplate = (t) => {
     setApiUrl(t.apiUrl || '');
+    setTestName(t.testName || '');
     setVus(t.vus || 10);
     setDuration(t.duration || '10s');
     setMethod(t.method || 'GET');
@@ -99,7 +101,7 @@ export default function BenchmarkForm({ onTestStart, disabled }) {
   // ── Save current config as template ──────────────────────────────────────
   const saveTemplate = () => {
     const name = templateName.trim() || `Template ${templates.length + 1}`;
-    const t = { id: Date.now(), name, apiUrl, vus, duration, method, authMode, authValue, customJson, rampUp, timeout, payload };
+    const t = { id: Date.now(), name, apiUrl, testName, vus, duration, method, authMode, authValue, customJson, rampUp, timeout, payload };
     const updated = [...templates, t];
     setTemplates(updated);
     saveTemplates(updated);
@@ -151,7 +153,7 @@ export default function BenchmarkForm({ onTestStart, disabled }) {
         setError(data.errors ? data.errors.map(e => e.msg).join(', ') : (data.error || 'Failed'));
         return;
       }
-      onTestStart({ testId: data.testId, apiUrl, vus, duration });
+      onTestStart({ testId: data.testId, apiUrl, testName: testName.trim() || null, vus, duration });
     } catch {
       setError('Network error — is the backend running?');
     } finally {
@@ -246,6 +248,23 @@ export default function BenchmarkForm({ onTestStart, disabled }) {
           </div>
         </div>
 
+        {/* ── Test Name ───────────────────────────────────────────────── */}
+        <div className="field">
+          <label className="field-label" htmlFor="testName">
+            Test Name
+            <span className="optional-tag">optional</span>
+          </label>
+          <input
+            id="testName" type="text"
+            className="input"
+            value={testName} onChange={e => setTestName(e.target.value)}
+            placeholder="e.g. Login API stress test"
+            disabled={disabled || loading} autoComplete="off"
+            maxLength={60}
+          />
+          <span className="field-hint">Label this test for easy identification in history</span>
+        </div>
+
         {/* ── Presets ─────────────────────────────────────────────────── */}
         <div className="field">
           <label className="field-label">Test Preset</label>
@@ -274,6 +293,11 @@ export default function BenchmarkForm({ onTestStart, disabled }) {
             <label className="field-label" htmlFor="vus">Virtual Users</label>
             <input id="vus" type="number" className="input" min="1" max="100"
               value={vus} onChange={e => setVus(e.target.value)} disabled={disabled || loading} />
+            {Number(vus) > 50 && (
+              <span className="field-hint field-hint-warn">
+                High VU count — target API may rate-limit or reject requests above 50 VUs.
+              </span>
+            )}
           </div>
           <div className="field">
             <label className="field-label" htmlFor="duration">Duration</label>
