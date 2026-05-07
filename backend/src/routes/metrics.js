@@ -1,6 +1,6 @@
 /**
  * Prometheus Metrics Endpoint
- * GET /metrics - Scraped by Prometheus
+ * GET /metrics — scraped by Prometheus every 10s
  */
 
 const express = require('express');

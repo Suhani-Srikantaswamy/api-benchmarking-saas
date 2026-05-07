@@ -6,11 +6,18 @@ export default defineConfig({
   server: {
     port: 3000,
     proxy: {
-      // Proxy API calls to backend during development
-      '/api': {
-        target: 'http://localhost:4000',
-        changeOrigin: true,
-      },
+      '/api': { target: 'http://localhost:4000', changeOrigin: true },
+      '/auth': { target: 'http://localhost:4000', changeOrigin: true },
+      '/health': { target: 'http://localhost:4000', changeOrigin: true },
+    },
+  },
+  test: {
+    globals: true,
+    environment: 'jsdom',
+    setupFiles: ['./src/tests/setup.js'],
+    coverage: {
+      reporter: ['text', 'json', 'html'],
+      exclude: ['node_modules/', 'src/tests/'],
     },
   },
 });
