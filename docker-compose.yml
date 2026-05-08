@@ -118,6 +118,12 @@ services:
       - "3000:8080"
     depends_on:
       - backend
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://localhost:8080 || exit 1"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
 
   # ── Prometheus ───────────────────────────────────────────────────────────────
   prometheus:
@@ -133,8 +139,14 @@ services:
       - '--config.file=/etc/prometheus/prometheus.yml'
       - '--storage.tsdb.path=/prometheus'
       - '--web.enable-lifecycle'
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://localhost:9090/-/healthy || exit 1"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 15s
 
-  # ── AlertManager (Fix 12) ────────────────────────────────────────────────────
+  # ── AlertManager ─────────────────────────────────────────────────────────────
   alertmanager:
     image: prom/alertmanager:v0.26.0
     container_name: benchmark-alertmanager
@@ -145,8 +157,14 @@ services:
       - "9093:9093"
     command:
       - '--config.file=/etc/alertmanager/alertmanager.yml'
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://localhost:9093/-/healthy || exit 1"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
 
-  # ── Grafana ──────────────────────────────────────────────────────────────────
+  # ── Grafana ───────────────────────────────────────────────────────────────────
   grafana:
     image: grafana/grafana:10.2.3
     container_name: benchmark-grafana
@@ -162,7 +180,14 @@ services:
     ports:
       - "3001:3000"
     depends_on:
-      - prometheus
+      prometheus:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://localhost:3000/api/health || exit 1"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 20s
 
   # ── Jaeger (Distributed Tracing) ─────────────────────────────────────────────
   jaeger:
@@ -170,11 +195,17 @@ services:
     container_name: benchmark-jaeger
     restart: unless-stopped
     environment:
-      COLLECTOR_OTLP_ENABLED: "true"   # accept OpenTelemetry traces
+      COLLECTOR_OTLP_ENABLED: "true"
     ports:
       - "16686:16686"   # Jaeger UI
       - "4317:4317"     # OTLP gRPC
-      - "4318:4318"     # OTLP HTTP (used by our backend)
+      - "4318:4318"     # OTLP HTTP (used by backend)
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://localhost:16686 || exit 1"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 15s
 
 volumes:
   postgres_data:

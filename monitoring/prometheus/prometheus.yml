@@ -2,13 +2,11 @@ global:
   scrape_interval:     15s
   evaluation_interval: 15s
 
-# Fix 12: AlertManager integration
 alerting:
   alertmanagers:
     - static_configs:
         - targets: ['alertmanager:9093']
 
-# Fix 12: Load alerting rules
 rule_files:
   - /etc/prometheus/alerts.yml
 
@@ -17,16 +15,9 @@ scrape_configs:
     static_configs:
       - targets: ['localhost:9090']
 
-  # Fix 11: Backend app metrics (request count, latency, error rate)
+  # Backend API metrics — request count, latency, error rate, queue depth
   - job_name: 'benchmark-backend'
     static_configs:
       - targets: ['backend:4000']
-    metrics_path: '/metrics'
-    scrape_interval: 10s
-
-  # Worker metrics (if exposed)
-  - job_name: 'benchmark-worker'
-    static_configs:
-      - targets: ['worker:4001']
     metrics_path: '/metrics'
     scrape_interval: 10s
