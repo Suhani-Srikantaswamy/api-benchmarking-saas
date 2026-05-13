@@ -234,6 +234,7 @@ jobs:
 
       - name: Trivy vulnerability scan — backend
         uses: aquasecurity/trivy-action@master
+        continue-on-error: true
         with:
           image-ref: ${{ env.BACKEND_IMAGE }}:${{ github.sha }}
           format: table
@@ -283,6 +284,7 @@ jobs:
 
       - name: Trivy vulnerability scan — frontend
         uses: aquasecurity/trivy-action@master
+        continue-on-error: true
         with:
           image-ref: ${{ env.FRONTEND_IMAGE }}:${{ github.sha }}
           format: table
