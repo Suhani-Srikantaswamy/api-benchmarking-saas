@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef, useCallback } from 'react';
+import { useState, useEffect, useRef, useCallback } from 'react';
 import BenchmarkForm from './components/BenchmarkForm';
 import Dashboard from './components/Dashboard';
 import ResultsHistory from './components/ResultsHistory';
@@ -168,7 +168,7 @@ export default function App() {
     };
 
     return () => es.close();
-  }, [activeTest?.testId, showToast]);
+  }, [activeTest?.testId, activeTest?.status, showToast]);
 
   const [formCollapsed, setFormCollapsed] = useState(false);
 

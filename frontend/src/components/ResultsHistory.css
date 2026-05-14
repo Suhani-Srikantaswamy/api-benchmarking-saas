@@ -94,6 +94,7 @@
 }
 .skel-url   { width: 180px; height: 0.75rem; }
 .skel-num   { width: 48px;  height: 0.75rem; }
+.skel-analysis { width: 180px; height: 0.75rem; }
 .skel-badge { width: 64px;  height: 1.1rem; border-radius: 2rem; }
 .skel-time  { width: 72px;  height: 0.75rem; }
 
@@ -139,4 +140,29 @@
   padding: 0.08rem 0.45rem; border-radius: 2rem;
   margin-right: 0.4rem; vertical-align: middle;
   font-family: inherit; letter-spacing: 0.02em;
+}
+
+.analysis-cell { max-width: 260px; }
+.analysis-pill {
+  display: inline-flex;
+  align-items: center;
+  max-width: 100%;
+  padding: 0.18rem 0.5rem;
+  border-radius: 999px;
+  font-size: 0.7rem;
+  line-height: 1.2;
+  border: 1px solid transparent;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.analysis-pill.has-analysis {
+  background: rgba(59, 130, 246, 0.12);
+  border-color: rgba(96, 165, 250, 0.24);
+  color: #bfdbfe;
+}
+.analysis-pill.no-analysis {
+  background: rgba(148, 163, 184, 0.08);
+  border-color: rgba(148, 163, 184, 0.14);
+  color: #94A3B8;
 }

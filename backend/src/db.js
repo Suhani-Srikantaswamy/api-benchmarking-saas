@@ -55,6 +55,7 @@ async function initSchema() {
       total_requests     INT,
       failed_requests    INT,
       error_rate         FLOAT,
+      nl_analysis        TEXT,
       status             VARCHAR(50) DEFAULT 'pending'
     )`,
     // Fix 17: Indexes for fast lookups
@@ -75,8 +76,8 @@ async function saveBenchmark(data) {
   const query = `
     INSERT INTO benchmark_results
       (test_id, api_url, avg_response_time, max_response_time, min_response_time,
-       requests_per_sec, total_requests, failed_requests, error_rate, status)
-    VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10)
+         requests_per_sec, total_requests, failed_requests, error_rate, nl_analysis, status)
+      VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11)
     ON CONFLICT (test_id) DO UPDATE SET
       avg_response_time = EXCLUDED.avg_response_time,
       max_response_time = EXCLUDED.max_response_time,
@@ -85,15 +86,16 @@ async function saveBenchmark(data) {
       total_requests    = EXCLUDED.total_requests,
       failed_requests   = EXCLUDED.failed_requests,
       error_rate        = EXCLUDED.error_rate,
+        nl_analysis       = EXCLUDED.nl_analysis,
       status            = EXCLUDED.status
     RETURNING *`;
 
-  const values = [
-    data.test_id, data.api_url,
-    data.avg_response_time, data.max_response_time, data.min_response_time,
-    data.requests_per_sec, data.total_requests, data.failed_requests,
-    data.error_rate, data.status || 'completed'
-  ];
+    const values = [
+      data.test_id, data.api_url,
+      data.avg_response_time, data.max_response_time, data.min_response_time,
+      data.requests_per_sec, data.total_requests, data.failed_requests,
+      data.error_rate, data.nl_analysis || null, data.status || 'completed'
+    ];
 
   const result = await pool.query(query, values);
   return result.rows[0];

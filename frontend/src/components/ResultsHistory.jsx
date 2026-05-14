@@ -10,6 +10,7 @@ function SkeletonRow() {
       <td><span className="skel skel-num" /></td>
       <td><span className="skel skel-num" /></td>
       <td><span className="skel skel-num" /></td>
+      <td><span className="skel skel-analysis" /></td>
       <td><span className="skel skel-badge" /></td>
       <td><span className="skel skel-time" /></td>
     </tr>
@@ -134,7 +135,7 @@ export default function ResultsHistory({ onCompare }) {
             <thead>
               <tr>
                 <th>API URL</th><th>Avg (ms)</th><th>Req/s</th>
-                <th>Requests</th><th>Error Rate</th><th>Status</th><th>Time</th>
+                <th>Requests</th><th>Error Rate</th><th>AI Summary</th><th>Status</th><th>Time</th>
               </tr>
             </thead>
             <tbody>
@@ -159,6 +160,7 @@ export default function ResultsHistory({ onCompare }) {
                 <th>Req/s</th>
                 <th>Requests</th>
                 <th>Error Rate</th>
+                <th>AI Summary</th>
                 <th>Status</th>
                 <th>Time</th>
               </tr>
@@ -176,6 +178,11 @@ export default function ResultsHistory({ onCompare }) {
                   <td className={`num-cell ${r.error_rate > 5 ? 'err' : 'ok'}`}>
                     {r.error_rate != null ? `${r.error_rate}%` : '—'}
                   </td>
+                  <td className="analysis-cell" title={previewAnalysis(r.nl_analysis)}>
+                    <span className={`analysis-pill ${r.nl_analysis ? 'has-analysis' : 'no-analysis'}`}>
+                      {r.nl_analysis ? previewAnalysis(r.nl_analysis) : 'No summary'}
+                    </span>
+                  </td>
                   <td><span className={`badge badge-${r.status}`}>{r.status}</span></td>
                   <td className="time-cell">{formatTime(r.timestamp)}</td>
                 </tr>
@@ -189,6 +196,18 @@ export default function ResultsHistory({ onCompare }) {
 }
 
 function truncate(s, n) { return s && s.length > n ? s.slice(0, n) + '…' : s; }
+function previewAnalysis(raw) {
+  if (!raw) return 'No summary';
+  let data = raw;
+  if (typeof raw === 'string') {
+    try { data = JSON.parse(raw); } catch { return truncate(raw, 52); }
+  }
+  const text = data.summary || data.diagnosis || data.message || data.title || '';
+  if (text) return truncate(String(text), 52);
+  if (Array.isArray(data.suggestions) && data.suggestions.length) return truncate(String(data.suggestions[0]), 52);
+  if (Array.isArray(data.findings) && data.findings.length) return truncate(String(data.findings[0]), 52);
+  return 'AI summary available';
+}
 function formatTime(ts) {
   if (!ts) return '—';
   const d = new Date(ts);

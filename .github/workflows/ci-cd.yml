@@ -14,7 +14,8 @@ concurrency:
 
 # ── Global env ────────────────────────────────────────────────────────────────
 env:
-  NODE_VERSION: '20'
+  NODE_VERSION: '24'
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: 'true'
   BACKEND_IMAGE: benchmark-backend
   FRONTEND_IMAGE: benchmark-frontend
 
@@ -224,7 +225,8 @@ jobs:
       - name: Build backend image
         uses: docker/build-push-action@v5
         with:
-          context: ./backend
+          context: .
+          file: backend/Dockerfile
           push: false
           tags: ${{ env.BACKEND_IMAGE }}:${{ github.sha }}
           build-args: INSTALL_K6=true
@@ -428,6 +430,80 @@ jobs:
             k6-results.json
             ci-load-test-summary.json
           retention-days: 7
+
+  # ── Job 9b: PR Analytics & Regression Check ─────────────────────────────────
+  pr-analytics:
+    name: PR Performance Analytics
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    needs: [test-backend]
+    if: github.event_name == 'pull_request'
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.11'
+
+      - name: Install backend dependencies
+        run: npm ci
+        working-directory: backend
+
+      - name: Start backend server
+        run: node src/index.js &
+        working-directory: backend
+        env:
+          PORT: 4000
+          NODE_ENV: test
+          DB_HOST: 127.0.0.1
+          DB_PORT: 5432
+          DB_NAME: benchmarkdb
+          DB_USER: postgres
+          DB_PASSWORD: ci-test-password
+          REDIS_HOST: 127.0.0.1
+          REDIS_PORT: 6379
+          JWT_SECRET: ci-test-jwt-secret-not-for-production
+          API_KEYS: demo-key-12345,test-key-67890
+          LOG_LEVEL: warn
+          OTEL_ENABLED: "false"
+
+      - name: Wait for backend to be ready
+        run: |
+          for i in $(seq 1 30); do
+            if curl -sf http://localhost:4000/health > /dev/null 2>&1; then
+              exit 0
+            fi
+            sleep 2
+          done
+          exit 1
+
+      - name: Install k6
+        run: |
+          curl -L https://github.com/grafana/k6/releases/download/v0.49.0/k6-v0.49.0-linux-amd64.tar.gz -o /tmp/k6.tar.gz
+          tar -xzf /tmp/k6.tar.gz -C /tmp
+          sudo mv /tmp/k6-v0.49.0-linux-amd64/k6 /usr/local/bin/k6
+          k6 version
+
+      - name: Run k6 (PR quick run)
+        run: |
+          k6 run --env BASE_URL=http://localhost:4000 --out json=k6-results.json backend/k6/ci-load-test.js
+
+      - name: Install Python deps for analytics
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r analytics/requirements.txt
+
+      - name: Run analytics processor
+        run: |
+          python analytics/ingest_k6.py ci-load-test-summary.json > analytics-output.json || true
+
+      - name: Run regression check
+        run: |
+          python analytics/check_regression.py ci-load-test-summary.json analytics/baseline.json
+
 
 # ══════════════════════════════════════════════════════════════════════════════
 # STAGE 3 — CONTINUOUS DEPLOYMENT

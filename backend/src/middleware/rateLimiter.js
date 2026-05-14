@@ -12,10 +12,10 @@ function ipKeyGenerator(req) {
   return ip.startsWith('::ffff:') ? ip.slice(7) : ip;
 }
 
-// General API rate limit — 100 requests per 15 minutes per IP
+// General API rate limit — keep CI/test runs unthrottled so load tests can run
 const generalLimiter = rateLimit({
   windowMs: 15 * 60 * 1000,
-  max: 100,
+  max: process.env.NODE_ENV === 'test' ? Number.MAX_SAFE_INTEGER : 100,
   standardHeaders: true,
   legacyHeaders: false,
   keyGenerator: ipKeyGenerator,
@@ -25,9 +25,10 @@ const generalLimiter = rateLimit({
 });
 
 // Strict limiter for load test trigger — 5 tests per minute per IP
+// Relax in test environment so CI can trigger multiple runs in quick succession
 const loadTestLimiter = rateLimit({
   windowMs: 60 * 1000,
-  max: 5,
+  max: process.env.NODE_ENV === 'test' ? Number.MAX_SAFE_INTEGER : 5,
   standardHeaders: true,
   legacyHeaders: false,
   keyGenerator: ipKeyGenerator,

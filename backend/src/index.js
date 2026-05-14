@@ -92,7 +92,7 @@ app.get('/health', (req, res) => {
 });
 
 // ── Global Error Handler ──────────────────────────────────────────────────────
-app.use((err, req, res, next) => {
+app.use((err, req, res, _next) => {
   logger.error('Unhandled error', {
     error: err.message,
     stack: err.stack,
@@ -113,6 +113,11 @@ async function start() {
   }
 }
 
-start();
+// Only start the HTTP server when this file is run directly.
+// Tests should `require('../src/index')` and use the exported `app`
+// without starting a network listener to avoid EADDRINUSE and lifecycle issues.
+if (require.main === module) {
+  start();
+}
 
 module.exports = app;

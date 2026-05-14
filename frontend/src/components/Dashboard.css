@@ -203,6 +203,47 @@
 .insight-warn  .insight-label { color: #FEF3C7; }
 .insight-error .insight-icon  { color: var(--danger); }
 .insight-error .insight-label { color: #FEE2E2; }
+.ai-summary-card {
+  background: linear-gradient(180deg, rgba(15, 23, 42, 0.95), rgba(2, 6, 23, 0.92));
+  border: 1px solid rgba(96, 165, 250, 0.22);
+  border-radius: 18px;
+  padding: 18px;
+  box-shadow: 0 14px 30px rgba(15, 23, 42, 0.22);
+}
+.ai-summary-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 14px;
+}
+.ai-summary-title {
+  font-size: 1rem;
+  font-weight: 700;
+  color: #e5e7eb;
+}
+.ai-summary-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 10px;
+  border-radius: 999px;
+  background: rgba(59, 130, 246, 0.14);
+  color: #bfdbfe;
+  font-size: 0.75rem;
+  font-weight: 700;
+}
+.ai-summary-body { display: flex; flex-direction: column; gap: 12px; }
+.ai-summary-lead { margin: 0; color: #f8fafc; font-weight: 700; }
+.ai-summary-text { margin: 0; color: #cbd5e1; line-height: 1.6; }
+.ai-summary-group {
+  background: rgba(30, 41, 59, 0.7);
+  border: 1px solid rgba(148, 163, 184, 0.12);
+  border-radius: 14px;
+  padding: 12px 14px;
+}
+.ai-summary-group-label { display: block; margin-bottom: 8px; color: #93c5fd; font-size: 0.78rem; font-weight: 700; text-transform: uppercase; letter-spacing: .05em; }
+.ai-summary-list { margin: 0; padding-left: 18px; color: #e2e8f0; display: grid; gap: 6px; }
 
 /* ── Percentile breakdown card ───────────────────────────────────────────── */
 .percentile-card {
