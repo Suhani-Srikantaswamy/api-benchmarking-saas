@@ -659,6 +659,7 @@ export default function Dashboard({ result }) {
   const loadCurve   = done ? buildLoadCurve(result)  : [];
   const anomalies   = done ? detectAnomalies(result) : [];
   const loadImpact  = done ? getLoadImpactInsight(result) : null;
+  const aiSummary   = done ? parseAiSummary(result.nl_analysis ?? result.analysis) : null;
 
   // Baseline comparison
   const [baseline,     setBaseline]     = useState(loadBaseline);
@@ -810,6 +811,36 @@ export default function Dashboard({ result }) {
                 </div>
               </div>
             ))}
+          </div>
+        </div>
+      )}
+
+      {/* ── AI Summary ───────────────────────────────────────────────── */}
+      {done && aiSummary && (
+        <div className="ai-summary-card fade-in">
+          <div className="ai-summary-header">
+            <span className="ai-summary-title">AI Summary</span>
+            <span className="ai-summary-badge">LLM-assisted diagnosis</span>
+          </div>
+          <div className="ai-summary-body">
+            {aiSummary.title && <p className="ai-summary-lead">{aiSummary.title}</p>}
+            {aiSummary.summary && <p className="ai-summary-text">{aiSummary.summary}</p>}
+            {aiSummary.issues.length > 0 && (
+              <div className="ai-summary-group">
+                <span className="ai-summary-group-label">Likely issues</span>
+                <ul className="ai-summary-list">
+                  {aiSummary.issues.map((item, index) => <li key={index}>{item}</li>)}
+                </ul>
+              </div>
+            )}
+            {aiSummary.fixes.length > 0 && (
+              <div className="ai-summary-group">
+                <span className="ai-summary-group-label">Predictive fixes</span>
+                <ul className="ai-summary-list">
+                  {aiSummary.fixes.map((item, index) => <li key={index}>{item}</li>)}
+                </ul>
+              </div>
+            )}
           </div>
         </div>
       )}
@@ -1123,4 +1154,26 @@ function triggerDownload(blob, filename) {
   a.href = URL.createObjectURL(blob);
   a.download = filename;
   a.click();
+}
+
+function parseAiSummary(raw) {
+  if (!raw) return null;
+
+  let data = raw;
+  if (typeof raw === 'string') {
+    try {
+      data = JSON.parse(raw);
+    } catch {
+      data = { summary: raw };
+    }
+  }
+
+  const arrays = (value) => Array.isArray(value) ? value.filter(Boolean).map(String) : [];
+
+  return {
+    title: data.title || data.heading || 'Performance diagnosis generated from benchmark data',
+    summary: data.summary || data.diagnosis || data.message || (typeof data === 'string' ? data : ''),
+    issues: arrays(data.issues || data.findings || data.problems || data.root_causes),
+    fixes: arrays(data.fixes || data.suggestions || data.recommendations || data.actions),
+  };
 }

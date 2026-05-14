@@ -78,6 +78,7 @@ const worker = new Worker(
           const metrics = parseK6Output(outputPath);
           logger.info('k6 test completed', { testId, metrics });
 
+          // Persist results
           await db.saveBenchmark({
             test_id: testId,
             api_url: apiUrl,
@@ -85,7 +86,50 @@ const worker = new Worker(
             status: 'completed'
           });
 
-          // Notify SSE clients
+          // Attempt to run analytics (Python) to generate NL diagnosis if available
+          try {
+            const analyticsInput = {
+              avg: metrics.avg_response_time,
+              p95: metrics.max_response_time || metrics.avg_response_time,
+              reqs: metrics.total_requests,
+              rps: metrics.requests_per_sec,
+              failed: metrics.failed_requests,
+              error_rate: (metrics.error_rate || 0) / 100.0
+            };
+
+            const analyticsPath = resolveAnalyticsPath();
+            const tmpSummary = path.join('/tmp', `analytics-summary-${testId}.json`);
+            fs.writeFileSync(tmpSummary, JSON.stringify(analyticsInput));
+
+            const py = execFile.bind(null, 'python3', [path.join(analyticsPath, 'ingest_k6.py'), tmpSummary], { timeout: 20000 });
+            py(async (pyErr, pyStdout, pyStderr) => {
+              if (pyErr) {
+                logger.warn('Analytics script failed', { testId, error: pyErr.message, pyStderr });
+              } else {
+                try {
+                  const out = JSON.parse(pyStdout);
+                  const nl = out.diagnosis || out.llm_refinement || out;
+                  await db.saveBenchmark({
+                    test_id: testId,
+                    api_url: apiUrl,
+                    ...metrics,
+                    nl_analysis: JSON.stringify(nl),
+                    status: 'completed'
+                  });
+
+                  // Notify SSE clients with diagnosis included
+                  notifyClients(testId, { ...metrics, test_id: testId, status: 'completed', analysis: nl });
+                } catch (e) {
+                  logger.warn('Failed to parse analytics output', { testId, error: e.message });
+                }
+              }
+              try { fs.unlinkSync(tmpSummary); } catch {}
+            });
+          } catch (e) {
+            logger.warn('Error running analytics', { testId, error: e.message });
+          }
+
+          // Notify SSE clients immediately with numeric metrics
           notifyClients(testId, { ...metrics, test_id: testId, status: 'completed' });
 
           // Cleanup
@@ -176,6 +220,21 @@ async function shutdown() {
   await worker.close();
   await db.pool.end();
   process.exit(0);
+}
+
+function resolveAnalyticsPath() {
+  const candidates = [
+    path.join(__dirname, '../../analytics'),
+    path.join(__dirname, '../analytics'),
+  ];
+
+  for (const candidate of candidates) {
+    if (fs.existsSync(path.join(candidate, 'ingest_k6.py'))) {
+      return candidate;
+    }
+  }
+
+  return candidates[0];
 }
 
 process.on('SIGTERM', shutdown);

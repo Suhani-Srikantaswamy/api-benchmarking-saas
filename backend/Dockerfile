@@ -2,20 +2,25 @@
 FROM node:20-alpine AS builder
 
 WORKDIR /app
-COPY package*.json ./
+COPY backend/package*.json ./
 RUN npm ci --only=production
 
 # ── Stage 2: Runtime ──────────────────────────────────────────────────────────
 FROM node:20-alpine
 
-RUN addgroup -S appgroup && adduser -S appuser -G appgroup
+RUN apk add --no-cache python3 py3-pip && \
+  addgroup -S appgroup && adduser -S appuser -G appgroup
 
 WORKDIR /app
 
 COPY --from=builder /app/node_modules ./node_modules
-COPY src/ ./src/
-COPY k6/ ./k6/
-COPY package.json ./
+COPY backend/src/ ./src/
+COPY backend/k6/ ./k6/
+COPY backend/package.json ./
+COPY analytics/ ./analytics/
+RUN python3 -m venv /opt/analytics-venv && \
+  /opt/analytics-venv/bin/pip install --no-cache-dir -r ./analytics/requirements.txt
+ENV PATH="/opt/analytics-venv/bin:${PATH}"
 
 # Install k6 only if not in CI environment
 # In CI: image is built for scanning only, k6 not needed

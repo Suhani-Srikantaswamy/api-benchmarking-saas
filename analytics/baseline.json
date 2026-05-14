@@ -1,0 +1,6 @@
+{
+  "p95_latency_ms": 500,
+  "error_rate": 0.05,
+  "requests_per_sec": 50,
+  "tolerance_percent": 20
+}

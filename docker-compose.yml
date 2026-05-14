@@ -41,8 +41,8 @@ services:
   # ── Backend API ──────────────────────────────────────────────────────────────
   backend:
     build:
-      context: ./backend
-      dockerfile: Dockerfile
+      context: .
+      dockerfile: backend/Dockerfile
       args:
         INSTALL_K6: "true"
     container_name: benchmark-backend
@@ -59,6 +59,7 @@ services:
       REDIS_PORT:     6379
       JWT_SECRET:     ${JWT_SECRET:-change-this-in-production}
       API_KEYS:       ${API_KEYS:-demo-key-12345}
+      OPENAI_API_KEY: ${OPENAI_API_KEY:-}
       LOG_LEVEL:      info
       OTEL_ENABLED:   "true"
       OTEL_SERVICE_NAME: benchmark-backend
@@ -79,8 +80,8 @@ services:
   # ── Worker (Fix 2, 3, 16: Separate k6 runner) ────────────────────────────────
   worker:
     build:
-      context: ./backend
-      dockerfile: Dockerfile
+      context: .
+      dockerfile: backend/Dockerfile
       args:
         INSTALL_K6: "true"
     container_name: benchmark-worker
@@ -97,6 +98,7 @@ services:
       DB_PASSWORD: ${POSTGRES_PASSWORD:-postgres}
       REDIS_HOST:  redis
       REDIS_PORT:  6379
+      OPENAI_API_KEY: ${OPENAI_API_KEY:-}
       LOG_LEVEL:   info
       OTEL_ENABLED: "true"
       OTEL_SERVICE_NAME: benchmark-worker
