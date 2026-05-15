@@ -131,16 +131,28 @@
 
 ### Option 1: Docker Compose (Recommended for Development)
 
-Get the entire stack running in under 2 minutes:
+Get the entire stack running locally with full deployment experience:
 
 ```bash
 # Clone the repository
 git clone <your-repo-url>
 cd api-benchmarking-saas
 
-# Start all services
-docker compose up --build
+# Create .env from example
+cp docker-compose.env.example .env
+# Edit .env and set your own passwords
+
+# Start all services (from WSL/Git Bash on Windows)
+docker compose up -d postgres redis
+docker compose up -d backend worker frontend prometheus grafana alertmanager jaeger
+
+# Verify deployment
+./scripts/health-check.sh --timeout 120
 ```
+
+> 📌 **On Windows?** Use WSL or Git Bash, not PowerShell, to avoid Bash script line-ending issues.
+
+> 📋 **See [DEPLOYMENT.md](./DEPLOYMENT.md)** for detailed step-by-step deployment instructions and redeploy checklist.
 
 **Access the services:**
 
@@ -149,35 +161,20 @@ docker compose up --build
 | 🎨 Frontend Dashboard | http://localhost:3000 | — |
 | 🔧 Backend API | http://localhost:4000 | API Key: `demo-key-12345` |
 | 📊 Prometheus | http://localhost:9090 | — |
-| 📈 Grafana | http://localhost:3001 | `admin` / `admin123` |
+| 📈 Grafana | http://localhost:3001 | `admin` / `${GRAFANA_PASSWORD}` (see `.env`) |
 | 🚨 AlertManager | http://localhost:9093 | — |
 | 🔍 Jaeger UI | http://localhost:16686 | — |
 
 ---
 
-### Option 2: Kubernetes (Minikube)
+### Option 2: Kubernetes (For Production)
 
-Deploy to a local Kubernetes cluster:
+Once you have the Docker-based stack working locally, you can deploy to production-grade Kubernetes:
 
 ```bash
-# 1. Start Minikube with sufficient resources
-minikube start --cpus=4 --memory=6144
-minikube addons enable ingress
-minikube addons enable metrics-server
+# 1. Prerequisites: kubectl, a running Kubernetes cluster (EKS, GKE, AKS, etc.)
 
-# 2. Build and push Docker images
-export DOCKER_USER=your-dockerhub-username
-
-docker build -t $DOCKER_USER/benchmark-backend:latest ./backend
-docker build -t $DOCKER_USER/benchmark-frontend:latest ./frontend
-
-docker push $DOCKER_USER/benchmark-backend:latest
-docker push $DOCKER_USER/benchmark-frontend:latest
-
-# 3. Update image references in k8s manifests
-# Replace YOUR_DOCKERHUB_USERNAME in k8s/*.yaml files
-
-# 4. Deploy to Kubernetes
+# 2. Deploy to Kubernetes (requires cluster access and image availability)
 kubectl apply -f k8s/namespace.yaml
 kubectl apply -f k8s/secrets.yaml
 kubectl apply -f k8s/configmap.yaml
@@ -192,24 +189,16 @@ kubectl apply -f k8s/pdb.yaml
 kubectl apply -f k8s/ingress.yaml
 kubectl apply -f k8s/network-policies.yaml
 
-# 5. Configure local DNS
-echo "$(minikube ip) benchmark.local" | sudo tee -a /etc/hosts
-
-# 6. Access the application
-open http://benchmark.local
-```
-
-**Verify deployment:**
-
-```bash
+# 3. Verify deployment
 kubectl get pods -n benchmark-saas
-kubectl get svc -n benchmark-saas
 kubectl logs -f deployment/backend -n benchmark-saas
 ```
 
+> 📌 **Start with Docker Compose first** to test the stack locally, then scale to Kubernetes when ready for production.
+
 ---
 
-### Option 3: Terraform (AWS EKS)
+### Option 3: Infrastructure as Code (Terraform for AWS EKS)
 
 Provision production infrastructure on AWS:
 
@@ -237,6 +226,8 @@ aws eks update-kubeconfig --name benchmark-cluster --region us-east-1
 - Application Load Balancer
 - Route53 DNS records
 - ACM SSL certificates
+
+> 📌 **For other cloud providers** (GCP, Azure, etc.), adapt the Terraform configs or use their native deployment tools.
 
 ---
 
@@ -504,10 +495,7 @@ api-benchmarking-saas/
 │       └── alertmanager.yml         # Alert routing
 │
 ├── 🔄 .github/workflows/            # CI/CD pipelines
-│   ├── ci.yml                       # Build & test
-│   ├── cd-staging.yml               # Deploy to staging
-│   ├── cd-production.yml            # Deploy to production
-│   └── terraform.yml                # Infrastructure updates
+│   └── ci-cd.yml                    # Lint, Test, Build, Deploy
 │
 ├── docker-compose.yml               # Local development stack
 └── README.md                        # This file
@@ -522,22 +510,25 @@ Automated workflows powered by GitHub Actions:
 ### Pipeline Stages
 
 ```
-┌─────────────┐     ┌─────────────┐     ┌─────────────┐     ┌─────────────┐
-│   Validate  │ --> │    Build    │ --> │  Security   │ --> │   Deploy    │
-│             │     │             │     │   Scan      │     │             │
-│ • Lint      │     │ • Docker    │     │ • Trivy     │     │ • Staging   │
-│ • Test      │     │ • Multi-arch│     │ • SAST      │     │ • Production│
-│ • Type Check│     │ • Tag       │     │ • Secrets   │     │ • Rollback  │
-└─────────────┘     └─────────────┘     └─────────────┘     └─────────────┘
+┌──────────────────┐     ┌─────────────────┐     ┌──────────────────┐
+│   Validate & Test│ --> │    Build Images │ --> │   Deploy & Verify │
+│                  │     │                 │     │                   │
+│ • ESLint         │     │ • Docker Build  │     │ • Docker Compose  │
+│ • Vitest         │     │ • Frontend Build│     │ • Health Checks   │
+│ • Jest           │     │ • Image Tag     │     │ • Integration Test│
+│ • npm audit      │     │ • Push to Hub   │     │ • k6 Load Test    │
+│ • Security Scan  │     │ • Artifact Save │     │ • Artifact Upload │
+└──────────────────┘     └─────────────────┘     └──────────────────┘
 ```
 
-### Deployment Strategy
+### Workflow File
 
-| Branch | Trigger | Environment | Approval Required |
-|--------|---------|-------------|-------------------|
-| `develop` | Push | Staging | ❌ No |
-| `main` | Push | Production | ✅ Yes |
-| `feature/*` | PR | Preview | ❌ No |
+The CI/CD pipeline is defined in [`.github/workflows/ci-cd.yml`](./.github/workflows/ci-cd.yml).
+
+**Pipeline runs on:**
+- Every push to `main`
+- Every pull request
+- Manual trigger via `workflow_dispatch`
 
 ### Workflow Features
 
@@ -549,24 +540,20 @@ Automated workflows powered by GitHub Actions:
 - 📊 **Deployment Metrics** — Success rate, duration tracking
 - 🔔 **Slack Notifications** — Build status alerts
 
-### Required GitHub Secrets
+### Optional GitHub Secrets
 
-Configure these in your repository settings:
+For Docker Hub publishing and advanced deployments, configure these in your repository settings:
 
-| Secret | Description | Example |
-|--------|-------------|---------|
-| `DOCKERHUB_USERNAME` | Docker Hub username | `myusername` |
-| `DOCKERHUB_TOKEN` | Docker Hub access token | `dckr_pat_...` |
-| `KUBE_CONFIG` | Production kubeconfig (base64) | `apiVersion: v1...` |
-| `KUBE_CONFIG_STAGING` | Staging kubeconfig (base64) | `apiVersion: v1...` |
-| `DB_PASSWORD` | PostgreSQL password | `secure_password` |
-| `JWT_SECRET` | JWT signing secret | `random_string_256bit` |
-| `SLACK_WEBHOOK` | Slack notification webhook | `https://hooks.slack.com/...` |
+| Secret | Description | Optional | Example |
+|--------|-------------|----------|----------|
+| `DOCKERHUB_USERNAME` | Docker Hub username | ✅ Yes | `myusername` |
+| `DOCKERHUB_TOKEN` | Docker Hub access token | ✅ Yes | `dckr_pat_...` |
+| `POSTGRES_PASSWORD` | PostgreSQL password | ✅ Yes | `secure_password` |
+| `JWT_SECRET` | JWT signing secret | ✅ Yes | `random_string_256bit` |
+| `GRAFANA_PASSWORD` | Grafana admin password | ✅ Yes | `secure_password` |
+| `API_KEYS` | Backend API keys | ✅ Yes | `prod-key-12345` |
 
-**Generate base64 kubeconfig:**
-```bash
-cat ~/.kube/config | base64
-```
+> 📌 **Local deployment** uses `.env` file. Secrets are only needed if you want to publish Docker images to a registry or deploy to production.
 
 ---
 
@@ -608,7 +595,7 @@ queue_jobs_waiting + queue_jobs_active
 
 ### Grafana Dashboards
 
-**Access:** http://localhost:3001 (admin / admin123)
+**Access:** http://localhost:3001 (admin / password from `.env` GRAFANA_PASSWORD)
 
 **Pre-configured Dashboard Panels:**
 
@@ -917,51 +904,29 @@ app.use(helmet({
 
 ### Environment Variables
 
-**Backend Configuration:**
+**Project Configuration:**
 
-Copy `backend/.env.example` to `backend/.env`:
+Copy `docker-compose.env.example` to `.env` in the project root:
 
 ```bash
-# Server
-PORT=4000
-NODE_ENV=development
+# PostgreSQL
+POSTGRES_PASSWORD=change-this-db-password
 
-# Database
-DB_HOST=localhost
-DB_PORT=5432
-DB_NAME=benchmarkdb
-DB_USER=postgres
-DB_PASSWORD=postgres
-DB_POOL_MIN=2
-DB_POOL_MAX=20
+# Grafana
+GRAFANA_PASSWORD=change-this-grafana-password
 
-# Redis
-REDIS_HOST=localhost
-REDIS_PORT=6379
-REDIS_PASSWORD=
+# Backend JWT
+JWT_SECRET=change-this-jwt-secret
 
-# Authentication
-JWT_SECRET=change-this-in-production-use-256-bit-random-string
-JWT_EXPIRY=24h
-API_KEYS=demo-key-12345,prod-key-67890
+# API Keys
+API_KEYS=demo-key-12345
 
-# Rate Limiting
-RATE_LIMIT_WINDOW_MS=900000
-RATE_LIMIT_MAX_REQUESTS=100
-BENCHMARK_RATE_LIMIT_MAX=5
+# Optional: Demo credentials
+DEMO_ADMIN_PASSWORD=change-this-admin-password
+DEMO_USER_PASSWORD=change-this-user-password
 
-# Logging
-LOG_LEVEL=info
-LOG_FORMAT=json
-
-# Observability
-OTEL_ENABLED=false
-OTEL_EXPORTER_JAEGER_ENDPOINT=http://localhost:14268/api/traces
-PROMETHEUS_ENABLED=true
-
-# Worker
-WORKER_CONCURRENCY=3
-WORKER_MAX_RETRIES=3
+# Optional: AI integration
+OPENAI_API_KEY=
 ```
 
 ### Kubernetes ConfigMap

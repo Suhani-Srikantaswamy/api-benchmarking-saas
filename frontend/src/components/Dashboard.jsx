@@ -133,9 +133,9 @@ function detectAnomalies(result) {
 
 /* ── Load Impact Insight — predictive, not reactive ─────────────────────── */
 function getLoadImpactInsight(result) {
-  const { avg_response_time, error_rate, requests_per_sec,
-          max_response_time, min_response_time, total_requests,
-          vus = 10, p95_response_time } = result;
+    const { avg_response_time, error_rate, requests_per_sec,
+      max_response_time, min_response_time, total_requests,
+      vus = 10 } = result;
 
   const findings   = [];   // predictive statements
   const predictions = [];  // "will break at X" statements
@@ -233,7 +233,7 @@ function getLoadImpactInsight(result) {
   return { findings, predictions, capacity, verdict };
 }
 
-function classifyBehaviour({ error_rate, avg_response_time, requests_per_sec, max_response_time }) {
+function classifyBehaviour({ error_rate, avg_response_time }) {
   // Rate-limited API: fast rejections, high error rate
   if (error_rate > 20 && avg_response_time < 300) {
     return {
@@ -570,7 +570,7 @@ function SuccessFailurePie({ result }) {
         { name: 'Failed',  value: failed,  color: '#EF4444' },
       ].filter(d => d.value > 0);
 
-  const CustomLabel = ({ cx, cy, midAngle, innerRadius, outerRadius, percent, name }) => {
+  const CustomLabel = ({ cx, cy, midAngle, innerRadius, outerRadius, percent }) => {
     if (percent < 0.05) return null;
     const RADIAN = Math.PI / 180;
     const r = innerRadius + (outerRadius - innerRadius) * 0.5;
