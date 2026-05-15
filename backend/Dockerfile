@@ -1,15 +1,17 @@
 # ── Stage 1: Build dependencies ──────────────────────────────────────────────
-FROM node:20-alpine AS builder
+FROM node:20-slim AS builder
 
 WORKDIR /app
 COPY backend/package*.json ./
 RUN npm ci --only=production
 
 # ── Stage 2: Runtime ──────────────────────────────────────────────────────────
-FROM node:20-alpine
+FROM node:20-slim
 
-RUN apk add --no-cache python3 py3-pip && \
-  addgroup -S appgroup && adduser -S appuser -G appgroup
+RUN apt-get update && \
+    apt-get install -y --no-install-recommends python3 python3-venv python3-pip ca-certificates && \
+    rm -rf /var/lib/apt/lists/* && \
+    groupadd -r appgroup && useradd -r -g appgroup appuser
 
 WORKDIR /app
 
@@ -19,6 +21,7 @@ COPY backend/k6/ ./k6/
 COPY backend/package.json ./
 COPY analytics/ ./analytics/
 RUN python3 -m venv /opt/analytics-venv && \
+  /opt/analytics-venv/bin/pip install --upgrade pip setuptools wheel && \
   /opt/analytics-venv/bin/pip install --no-cache-dir -r ./analytics/requirements.txt
 ENV PATH="/opt/analytics-venv/bin:${PATH}"
 
