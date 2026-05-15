@@ -5,6 +5,7 @@ import ResultsHistory from './components/ResultsHistory';
 import CompareView from './components/CompareView';
 import ErrorBoundary from './components/ErrorBoundary';
 import Toast from './components/Toast';
+import { getBackendUrl } from './api/client';
 import './App.css';
 
 const API_KEY = 'demo-key-12345';
@@ -107,7 +108,7 @@ export default function App() {
   // ── Backend health ────────────────────────────────────────────────────────
   useEffect(() => {
     const check = () =>
-      fetch('/health')
+      fetch(`${getBackendUrl()}/health`)
         .then(r => setBackendStatus(r.ok ? 'ok' : 'down'))
         .catch(() => setBackendStatus('down'));
     check();
@@ -121,7 +122,7 @@ export default function App() {
     if (activeTest.status === 'completed' || activeTest.status === 'failed') return;
 
     eventSourceRef.current?.close();
-    const es = new EventSource(`/api/events/${activeTest.testId}`);
+    const es = new EventSource(`${getBackendUrl()}/api/events/${activeTest.testId}`);
     eventSourceRef.current = es;
 
     es.onmessage = (e) => {
@@ -148,7 +149,7 @@ export default function App() {
       es.close();
       const iv = setInterval(async () => {
         try {
-          const r = await fetch(`/api/benchmark/${activeTest.testId}`, {
+          const r = await fetch(`${getBackendUrl()}/api/benchmark/${activeTest.testId}`, {
             headers: { 'X-API-Key': API_KEY },
           });
           if (r.ok) {
