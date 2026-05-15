@@ -1,12 +1,12 @@
 # ── Stage 1: Build dependencies ──────────────────────────────────────────────
-FROM node:20-slim AS builder
+FROM node:24-slim AS builder
 
 WORKDIR /app
 COPY backend/package*.json ./
 RUN npm ci --only=production
 
 # ── Stage 2: Runtime ──────────────────────────────────────────────────────────
-FROM node:20-slim
+FROM node:24-slim
 
 RUN apt-get update && \
     apt-get install -y --no-install-recommends python3 python3-venv python3-pip ca-certificates && \
