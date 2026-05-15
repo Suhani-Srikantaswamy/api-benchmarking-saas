@@ -30,7 +30,7 @@ ENV PATH="/opt/analytics-venv/bin:${PATH}"
 # In production: set INSTALL_K6=true
 ARG INSTALL_K6=false
 RUN if [ "$INSTALL_K6" = "true" ]; then \
-      apk add --no-cache curl && \
+      apt-get update && apt-get install -y --no-install-recommends curl ca-certificates && \
       ARCH=$(uname -m) && \
       if [ "$ARCH" = "x86_64" ]; then K6_ARCH="amd64"; else K6_ARCH="arm64"; fi && \
       curl -L "https://github.com/grafana/k6/releases/download/v0.49.0/k6-v0.49.0-linux-${K6_ARCH}.tar.gz" \
@@ -38,7 +38,7 @@ RUN if [ "$INSTALL_K6" = "true" ]; then \
       tar -xzf /tmp/k6.tar.gz -C /tmp && \
       mv "/tmp/k6-v0.49.0-linux-${K6_ARCH}/k6" /usr/local/bin/k6 && \
       rm -rf /tmp/k6* && \
-      apk del curl; \
+      apt-get purge -y --auto-remove curl && rm -rf /var/lib/apt/lists/*; \
     fi
 
 RUN chown -R appuser:appgroup /app
