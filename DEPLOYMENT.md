@@ -1,181 +1,133 @@
 # Deployment Guide
 
-This project is designed to deploy as a full Docker-based stack. The simplest and most reliable path is to run the entire stack with Docker Compose rather than splitting it across multiple hosts.
+This project runs as a full Docker-based stack locally, with the frontend deployed on Vercel and the backend exposed via LocalTunnel.
 
-## What Gets Deployed First
+## Architecture
 
-Deploy in this order:
+```
+Professor's Browser
+       ↓
+Vercel (Frontend) → https://benchmark-saas-demo.loca.lt (LocalTunnel)
+                              ↓
+                    Your Computer (Docker)
+                    - Backend API    :4000
+                    - Worker
+                    - PostgreSQL     :5432
+                    - Redis          :6379
+                    - Grafana        :3001
+                    - Prometheus     :9090
+                    - Jaeger         :16686
+                    - AlertManager   :9093
+```
 
-1. PostgreSQL and Redis
-2. Backend API and worker
-3. Frontend
-4. Observability stack: Prometheus, Grafana, Jaeger, AlertManager
+## Environment Variables
 
-Why this order matters:
-- The backend depends on PostgreSQL and Redis.
-- The worker depends on PostgreSQL and Redis.
-- The frontend depends on the backend API.
-- The observability services read metrics and traces from the running app stack.
-
-## Required Environment Variables
-
-Create a `.env` file in the repository root before deploying.
-
-Use `docker-compose.env.example` as the template.
-
-| Variable | Required | Purpose |
-|---|---|---|
-| `POSTGRES_PASSWORD` | Yes | PostgreSQL password used by backend, worker, and database container |
-| `GRAFANA_PASSWORD` | Yes | Grafana admin password |
-| `JWT_SECRET` | Yes | JWT signing secret for backend auth |
-| `API_KEYS` | Yes | Comma-separated API keys accepted by the backend |
-| `DEMO_ADMIN_PASSWORD` | No | Demo admin password for local/dev use |
-| `DEMO_USER_PASSWORD` | No | Demo user password for local/dev use |
-| `OPENAI_API_KEY` | No | Optional AI analysis integration |
-
-Example `.env`:
+The `.env` file in the project root is required before starting Docker. Current working values:
 
 ```env
-POSTGRES_PASSWORD=change-this-db-password
-GRAFANA_PASSWORD=change-this-grafana-password
-JWT_SECRET=change-this-jwt-secret
+POSTGRES_PASSWORD=demo123
+GRAFANA_PASSWORD=demo123
+JWT_SECRET=demo-secret-key-for-benchmarking-saas
 API_KEYS=demo-key-12345
-DEMO_ADMIN_PASSWORD=change-this-admin-password
-DEMO_USER_PASSWORD=change-this-user-password
+DEMO_ADMIN_PASSWORD=admin123
+DEMO_USER_PASSWORD=demo123
 OPENAI_API_KEY=
 ```
 
-## Exact Redeploy Checklist
+## Starting the Stack
 
-Use this checklist any time you want to redeploy the stack.
+### First-time setup (or after password issues)
 
-1. Pull the latest changes.
+If the postgres volume has a stale password, wipe it first:
 
-```bash
-git pull
+```powershell
+docker compose down
+docker volume rm devops_project_postgres_data
+docker compose up -d
 ```
 
-2. Confirm the root `.env` file exists and has values.
+### Normal startup (every subsequent time)
 
-```bash
-cat .env
+```powershell
+docker compose up -d
 ```
 
-3. If you are on Windows, run the deployment from WSL or Git Bash.
+Wait about 60 seconds for all services to initialize, then verify:
 
-The deployment scripts are Bash scripts, so the safest option is:
-- WSL
-- Git Bash
-
-4. Stop the current stack if one is already running.
-
-```bash
-docker compose down --remove-orphans
-```
-
-5. Build the images.
-
-```bash
-docker compose build --parallel
-```
-
-6. Start infrastructure first.
-
-```bash
-docker compose up -d postgres redis
-```
-
-7. Wait for PostgreSQL and Redis to become healthy.
-
-```bash
+```powershell
 docker compose ps
 ```
 
-8. Start the application services.
+All services should show `healthy` or `Up`. Backend may show `unhealthy` briefly — this is normal during startup.
 
-```bash
-docker compose up -d backend worker frontend prometheus grafana alertmanager jaeger
+## Starting the Public Tunnel
+
+The tunnel exposes your local backend publicly with a fixed URL:
+
+```powershell
+npx localtunnel --port 4000 --subdomain benchmark-saas-demo
 ```
 
-9. Verify the deployment.
+This always gives: `https://benchmark-saas-demo.loca.lt`
 
-```bash
-./scripts/health-check.sh --timeout 120
+Keep this terminal open during your demo. The tunnel dies when you close it.
+
+## Vercel Frontend
+
+Frontend is deployed at: `https://api-benchmarking-saas-dc58jiocs.vercel.app`
+
+The `VITE_BACKEND_URL` environment variable is set to `https://benchmark-saas-demo.loca.lt` in the Vercel dashboard. This is permanent — no need to update it as long as you use the same subdomain.
+
+## Service URLs
+
+| Service | URL | Credentials |
+|---------|-----|-------------|
+| Frontend (Vercel) | https://api-benchmarking-saas-dc58jiocs.vercel.app | — |
+| Backend (tunnel) | https://benchmark-saas-demo.loca.lt | API Key: `demo-key-12345` |
+| Backend (local) | http://localhost:4000 | API Key: `demo-key-12345` |
+| Grafana | http://localhost:3001 | admin / demo123 |
+| Prometheus | http://localhost:9090 | — |
+| Jaeger | http://localhost:16686 | — |
+| AlertManager | http://localhost:9093 | — |
+
+## Stopping Everything
+
+```powershell
+docker compose down
+# Ctrl+C in the LocalTunnel terminal
 ```
 
-10. Inspect logs if anything is unhealthy.
+## Troubleshooting
 
-```bash
-docker compose logs -f backend
+### Backend shows unhealthy / password auth failed
+
+```powershell
+docker compose down
+docker volume rm devops_project_postgres_data
+docker compose up -d
 ```
 
-```bash
-docker compose logs -f worker
+### Tunnel gives 408 or connection refused
+
+1. Verify backend is healthy: `docker compose ps`
+2. Visit `https://benchmark-saas-demo.loca.lt` in browser once to bypass interstitial
+3. Restart tunnel if needed
+
+### Frontend shows "Network error"
+
+1. Check tunnel is running
+2. Check backend is healthy: `docker compose logs backend --tail=10`
+3. Hard refresh Vercel page: `Ctrl+Shift+R`
+
+### Grafana/Prometheus/Jaeger not accessible
+
+These run locally only. Access them at `http://localhost:3001`, `http://localhost:9090`, `http://localhost:16686` from your own machine while Docker is running.
+
+### Not all services started
+
+```powershell
+docker compose up -d
+docker compose ps
 ```
 
-```bash
-docker compose logs -f frontend
-```
-
-11. Open the running services.
-
-- Frontend: http://localhost:3000
-- Backend: http://localhost:4000
-- Prometheus: http://localhost:9090
-- Grafana: http://localhost:3001
-- Jaeger: http://localhost:16686
-- AlertManager: http://localhost:9093
-
-## Recommended Deployment Flow
-
-If you want to deploy manually instead of using the helper script, run these commands in order from the repository root:
-
-```bash
-docker compose down --remove-orphans
-docker compose build --parallel
-docker compose up -d postgres redis
-docker compose up -d backend worker frontend prometheus grafana alertmanager jaeger
-./scripts/health-check.sh --timeout 120
-```
-
-## Deploy Script
-
-The repository already includes `scripts/deploy.sh`, which performs the same flow automatically:
-
-- loads `.env`
-- checks Docker and Docker Compose
-- builds images
-- starts PostgreSQL and Redis first
-- starts the app and observability services
-- waits for the backend health endpoint
-- prints a deployment summary
-
-Run it from the repository root:
-
-```bash
-bash scripts/deploy.sh
-```
-
-If Bash line endings cause an error on Windows, run it in WSL/Git Bash or normalize the script to Unix line endings first.
-
-## What This Deployment Produces
-
-This stack deploys locally as Docker containers, not as a Vercel app.
-
-It creates:
-- a frontend container serving the React/Vite build
-- a backend API container
-- a worker container for queued benchmark jobs
-- PostgreSQL and Redis containers
-- Prometheus, Grafana, Jaeger, and AlertManager containers
-
-## If You Want a Public Deployment Later
-
-For a public deployment, keep the same container model and move it to a Docker-friendly host such as:
-- a VPS with Docker Compose
-- Render
-- Railway
-- Fly.io
-- Kubernetes/EKS
-
-Vercel is only a fit for the frontend part of this repo; the full app needs backend services, a queue, and a database.
+If only some services are running, run `docker compose up -d` again — it starts any missing ones without touching healthy ones.
