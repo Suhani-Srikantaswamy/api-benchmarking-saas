@@ -81,15 +81,15 @@ app.use(appMetrics.metricsMiddleware);
 app.use(generalLimiter);
 
 // ── Routes ────────────────────────────────────────────────────────────────────
-app.use('/auth',          authRoutes);
-app.use('/api/benchmark', benchmarkRoutes);
-app.use('/api/events',    eventsRouter);  // Fix 19: SSE for real-time updates
-app.use('/metrics',       metricsRoutes);
-
-// Health check (no auth required — used by K8s probes)
+// Health check MUST be before rate limiter — used by Docker, K8s, and Vercel
 app.get('/health', (req, res) => {
   res.json({ status: 'ok', timestamp: new Date(), version: '2.0.0' });
 });
+
+app.use('/auth',          authRoutes);
+app.use('/api/benchmark', benchmarkRoutes);
+app.use('/api/events',    eventsRouter);
+app.use('/metrics',       metricsRoutes);
 
 // ── Global Error Handler ──────────────────────────────────────────────────────
 app.use((err, req, res, _next) => {
