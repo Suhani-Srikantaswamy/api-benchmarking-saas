@@ -4,10 +4,14 @@
  */
 
 const getBackendUrl = () => {
-  // Vercel deployment: VITE_BACKEND_URL will be set to the tunnel URL
-  // Local development: defaults to localhost:4000
   return import.meta.env.VITE_BACKEND_URL || 'http://localhost:4000';
 };
+
+// LocalTunnel requires this header to bypass its interstitial page for programmatic requests
+export const tunnelHeaders = () =>
+  import.meta.env.VITE_BACKEND_URL?.includes('loca.lt')
+    ? { 'bypass-tunnel-reminder': 'true' }
+    : {};
 
 export { getBackendUrl };
 
@@ -19,6 +23,7 @@ export const apiClient = {
       headers: {
         'Content-Type': 'application/json',
         'X-API-Key': apiKey,
+        ...tunnelHeaders(),
       },
       body: JSON.stringify(payload),
     });
@@ -28,7 +33,7 @@ export const apiClient = {
   async getBenchmarkResult(testId, apiKey = 'demo-key-12345') {
     const backendUrl = getBackendUrl();
     const response = await fetch(`${backendUrl}/api/benchmark/${testId}`, {
-      headers: { 'X-API-Key': apiKey },
+      headers: { 'X-API-Key': apiKey, ...tunnelHeaders() },
     });
     return response.json();
   },
@@ -36,7 +41,7 @@ export const apiClient = {
   async getHistory(apiKey = 'demo-key-12345') {
     const backendUrl = getBackendUrl();
     const response = await fetch(`${backendUrl}/api/benchmark/history`, {
-      headers: { 'X-API-Key': apiKey },
+      headers: { 'X-API-Key': apiKey, ...tunnelHeaders() },
     });
     return response.json();
   },
@@ -44,7 +49,7 @@ export const apiClient = {
   async compareResults(testId1, testId2, apiKey = 'demo-key-12345') {
     const backendUrl = getBackendUrl();
     const response = await fetch(`${backendUrl}/api/benchmark/compare/${testId1}/${testId2}`, {
-      headers: { 'X-API-Key': apiKey },
+      headers: { 'X-API-Key': apiKey, ...tunnelHeaders() },
     });
     return response.json();
   },

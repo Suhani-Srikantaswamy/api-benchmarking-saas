@@ -1,6 +1,6 @@
 import { useState, useEffect, useMemo } from 'react';
 import './ResultsHistory.css';
-import { getBackendUrl } from '../api/client';
+import { getBackendUrl, tunnelHeaders } from '../api/client';
 
 /* ── Skeleton row ────────────────────────────────────────────────────────── */
 function SkeletonRow() {
@@ -60,7 +60,7 @@ export default function ResultsHistory({ onCompare }) {
   const fetchResults = async () => {
     setLoading(true);
     try {
-      const r = await fetch(`${getBackendUrl()}/api/benchmark`, { headers: { 'X-API-Key': 'demo-key-12345' } });
+      const r = await fetch(`${getBackendUrl()}/api/benchmark`, { headers: { 'X-API-Key': 'demo-key-12345', ...tunnelHeaders() } });
       if (!r.ok) throw new Error('Failed');
       setResults(await r.json());
       setError('');
