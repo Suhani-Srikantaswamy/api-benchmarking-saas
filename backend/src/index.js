@@ -55,7 +55,7 @@ app.use((req, res, next) => {
 app.use(cors({
   origin: process.env.CORS_ORIGIN || '*',
   methods: ['GET', 'POST', 'OPTIONS'],
-  allowedHeaders: ['Content-Type', 'Authorization', 'X-API-Key'],
+  allowedHeaders: ['Content-Type', 'Authorization', 'X-API-Key', 'bypass-tunnel-reminder'],
 }));
 app.use(express.json({ limit: '10kb' })); // Fix: limit body size
 
