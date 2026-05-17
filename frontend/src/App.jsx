@@ -5,7 +5,7 @@ import ResultsHistory from './components/ResultsHistory';
 import CompareView from './components/CompareView';
 import ErrorBoundary from './components/ErrorBoundary';
 import Toast from './components/Toast';
-import { getBackendUrl } from './api/client';
+import { getBackendUrl, tunnelHeaders } from './api/client';
 import './App.css';
 
 const API_KEY = 'demo-key-12345';
@@ -108,7 +108,9 @@ export default function App() {
   // ── Backend health ────────────────────────────────────────────────────────
   useEffect(() => {
     const check = () =>
-      fetch(`${getBackendUrl()}/health`)
+      fetch(`${getBackendUrl()}/health`, {
+        headers: { 'bypass-tunnel-reminder': 'true' },
+      })
         .then(r => setBackendStatus(r.ok ? 'ok' : 'down'))
         .catch(() => setBackendStatus('down'));
     check();
@@ -150,7 +152,7 @@ export default function App() {
       const iv = setInterval(async () => {
         try {
           const r = await fetch(`${getBackendUrl()}/api/benchmark/${activeTest.testId}`, {
-            headers: { 'X-API-Key': API_KEY },
+            headers: { 'X-API-Key': API_KEY, ...tunnelHeaders() },
           });
           if (r.ok) {
             const d = await r.json();

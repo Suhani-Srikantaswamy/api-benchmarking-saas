@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend } from 'recharts';
 import './CompareView.css';
-import { getBackendUrl } from '../api/client';
+import { getBackendUrl, tunnelHeaders } from '../api/client';
 
 export default function CompareView() {
   const [tests,  setTests]  = useState([]);
@@ -10,7 +10,7 @@ export default function CompareView() {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    fetch(`${getBackendUrl()}/api/benchmark`, { headers: { 'X-API-Key': 'demo-key-12345' } })
+    fetch(`${getBackendUrl()}/api/benchmark`, { headers: { 'X-API-Key': 'demo-key-12345', ...tunnelHeaders() } })
       .then(r => r.json())
       .then(data => {
         const completed = data.filter(t => t.status === 'completed');
