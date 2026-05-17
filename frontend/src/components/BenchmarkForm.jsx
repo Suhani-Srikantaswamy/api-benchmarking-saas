@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import './BenchmarkForm.css';
+import apiClient from '../api/client';
 
 const PRESETS = [
   { label: 'Light',  vus: 10, duration: '10s', desc: '10 VUs · 10s' },
@@ -139,17 +140,12 @@ export default function BenchmarkForm({ onTestStart, disabled }) {
 
     setLoading(true);
     try {
-      const res = await fetch('/api/benchmark/run', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json', 'X-API-Key': 'demo-key-12345' },
-        body: JSON.stringify({
-          apiUrl, vus: Number(vus), duration, method,
-          headers: parsedHeaders,
-          ...(body ? { body } : {}),
-        }),
+      const data = await apiClient.runBenchmark({
+        apiUrl, vus: Number(vus), duration, method,
+        headers: parsedHeaders,
+        ...(body ? { body } : {}),
       });
-      const data = await res.json();
-      if (!res.ok) {
+      if (!data.testId) {
         setError(data.errors ? data.errors.map(e => e.msg).join(', ') : (data.error || 'Failed'));
         return;
       }

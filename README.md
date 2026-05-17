@@ -6,6 +6,13 @@
 [![Kubernetes](https://img.shields.io/badge/Kubernetes-Ready-326CE5?logo=kubernetes&logoColor=white)](https://kubernetes.io)
 [![License](https://img.shields.io/badge/License-MIT-green.svg)](LICENSE)
 
+## 📚 Quick Links
+
+- 🚀 **[Local Deployment](./DEPLOYMENT.md)** — Run full stack on Docker Compose
+- 🎓 **[Vercel Demo Setup](./VERCEL_DEPLOYMENT.md)** — Deploy frontend to Vercel, backend locally (perfect for presentations)
+- ⚡ **[Demo Quick Start](./DEMO_QUICKSTART.md)** — 30-minute demo checklist
+- ☸️ **[Kubernetes Deployment](./k8s/)** — Production-ready K8s manifests
+
 ## ✨ Features
 
 **Core Capabilities**
