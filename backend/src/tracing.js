@@ -20,6 +20,7 @@
 
   const exporter = new OTLPTraceExporter({
     url: process.env.OTEL_EXPORTER_OTLP_ENDPOINT || 'http://jaeger:4318/v1/traces',
+    headers: { 'Content-Type': 'application/json' },
   });
 
   const sdk = new NodeSDK({
