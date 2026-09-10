@@ -142,7 +142,7 @@ Get the entire stack running locally with full deployment experience:
 
 ```bash
 # Clone the repository
-git clone <your-repo-url>
+git clone https://github.com/Suhani-Srikantaswamy/api-benchmarking-saas.git
 cd api-benchmarking-saas
 
 # Create .env from example
@@ -168,7 +168,7 @@ docker compose up -d backend worker frontend prometheus grafana alertmanager jae
 | 🎨 Frontend Dashboard | http://localhost:3000 | — |
 | 🔧 Backend API | http://localhost:4000 | API Key: `demo-key-12345` |
 | 📊 Prometheus | http://localhost:9090 | — |
-| 📈 Grafana | http://localhost:3001 | `admin` / `${GRAFANA_PASSWORD}` (see `.env`) |
+| 📈 Grafana | http://localhost:3001 | `admin` / your `GRAFANA_PASSWORD` from `.env` |
 | 🚨 AlertManager | http://localhost:9093 | — |
 | 🔍 Jaeger UI | http://localhost:16686 | — |
 
@@ -1313,7 +1313,7 @@ resources:
 
 ## 🤝 Contributing
 
-We welcome contributions! Please follow these guidelines:
+Contributions are welcome! Please follow these guidelines:
 
 ### Development Setup
 
