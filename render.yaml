@@ -1,0 +1,63 @@
+services:
+  # ── Backend API ──────────────────────────────────────────────────────────────
+  - type: web
+    name: benchmark-backend
+    runtime: node
+    rootDir: backend
+    buildCommand: npm install && curl -L https://github.com/grafana/k6/releases/download/v0.49.0/k6-v0.49.0-linux-amd64.tar.gz -o /tmp/k6.tar.gz && tar -xzf /tmp/k6.tar.gz -C /tmp && cp /tmp/k6-v0.49.0-linux-amd64/k6 /usr/local/bin/k6
+    startCommand: node src/index.js
+    plan: free
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: PORT
+        value: 4000
+      - key: JWT_SECRET
+        generateValue: true
+      - key: API_KEYS
+        value: demo-key-12345
+      - key: LOG_LEVEL
+        value: info
+      - key: OTEL_ENABLED
+        value: "false"
+      - key: DATABASE_URL
+        fromDatabase:
+          name: benchmark-db
+          property: connectionString
+      - key: REDIS_URL
+        sync: false  # set manually from Upstash
+
+  # ── Worker ───────────────────────────────────────────────────────────────────
+  - type: worker
+    name: benchmark-worker
+    runtime: node
+    rootDir: backend
+    buildCommand: npm install && curl -L https://github.com/grafana/k6/releases/download/v0.49.0/k6-v0.49.0-linux-amd64.tar.gz -o /tmp/k6.tar.gz && tar -xzf /tmp/k6.tar.gz -C /tmp && cp /tmp/k6-v0.49.0-linux-amd64/k6 /usr/local/bin/k6
+    startCommand: node src/worker.js
+    plan: free
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: JWT_SECRET
+        fromService:
+          name: benchmark-backend
+          type: web
+          envVarKey: JWT_SECRET
+      - key: API_KEYS
+        value: demo-key-12345
+      - key: LOG_LEVEL
+        value: info
+      - key: OTEL_ENABLED
+        value: "false"
+      - key: DATABASE_URL
+        fromDatabase:
+          name: benchmark-db
+          property: connectionString
+      - key: REDIS_URL
+        sync: false  # set manually from Upstash
+
+databases:
+  - name: benchmark-db
+    plan: free
+    databaseName: benchmarkdb
+    user: benchmark_user

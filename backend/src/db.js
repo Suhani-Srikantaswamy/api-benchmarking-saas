@@ -6,13 +6,24 @@
 const { Pool } = require('pg');
 const logger = require('./logger');
 
-// ── Fix 18: Tuned connection pool ─────────────────────────────────────────────
+// ── Connection pool — supports DATABASE_URL (Render) or individual vars ───────
+const poolConfig = process.env.DATABASE_URL
+  ? {
+      connectionString: process.env.DATABASE_URL,
+      ssl: process.env.DATABASE_URL.includes('render.com')
+        ? { rejectUnauthorized: false }
+        : false,
+    }
+  : {
+      host:     process.env.DB_HOST     || 'localhost',
+      port:     process.env.DB_PORT     || 5432,
+      database: process.env.DB_NAME     || 'benchmarkdb',
+      user:     process.env.DB_USER     || 'postgres',
+      password: process.env.DB_PASSWORD || 'postgres',
+    };
+
 const pool = new Pool({
-  host:     process.env.DB_HOST     || 'localhost',
-  port:     process.env.DB_PORT     || 5432,
-  database: process.env.DB_NAME     || 'benchmarkdb',
-  user:     process.env.DB_USER     || 'postgres',
-  password: process.env.DB_PASSWORD || 'postgres',
+  ...poolConfig,
   max:               20,    // max connections in pool
   min:               2,     // keep 2 connections warm
   idleTimeoutMillis: 30000, // close idle connections after 30s

@@ -7,12 +7,24 @@
 const { Queue } = require('bullmq');
 const logger = require('./logger');
 
-const redisConnection = {
-  host: process.env.REDIS_HOST || 'localhost',
-  port: parseInt(process.env.REDIS_PORT) || 6379,
-  password: process.env.REDIS_PASSWORD || undefined,
-  maxRetriesPerRequest: null, // required by BullMQ
-};
+// Supports REDIS_URL (Upstash/Render) or individual REDIS_HOST/PORT vars
+const redisConnection = process.env.REDIS_URL
+  ? (() => {
+      const url = new URL(process.env.REDIS_URL);
+      return {
+        host: url.hostname,
+        port: parseInt(url.port) || 6379,
+        password: url.password || undefined,
+        tls: process.env.REDIS_URL.startsWith('rediss://') ? {} : undefined,
+        maxRetriesPerRequest: null,
+      };
+    })()
+  : {
+      host: process.env.REDIS_HOST || 'localhost',
+      port: parseInt(process.env.REDIS_PORT) || 6379,
+      password: process.env.REDIS_PASSWORD || undefined,
+      maxRetriesPerRequest: null, // required by BullMQ
+    };
 
 // The queue that holds pending load test jobs
 const loadTestQueue = new Queue('load-tests', {
